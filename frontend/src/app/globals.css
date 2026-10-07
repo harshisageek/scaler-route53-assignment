@@ -1,0 +1,17 @@
+/*
+ * Cloudscape ships the AWS console's own design tokens, so almost no custom
+ * CSS is needed. This file only covers what the design system leaves to the
+ * host page.
+ */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+#__next,
+body > div:first-child {
+  height: 100%;
+}
