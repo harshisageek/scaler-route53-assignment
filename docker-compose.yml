@@ -1,0 +1,64 @@
+# Local development: `docker compose up --build`, then open http://localhost:3000.
+#
+# Both services bind-mount their source, so edits reload without a rebuild.
+# Settings come from each service's .env when present, else from .env.example.
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: development
+    env_file:
+      - path: ./backend/.env.example
+      - path: ./backend/.env
+        required: false
+    environment:
+      # The SQLite file lives in a named volume so it survives `docker compose down`.
+      DATABASE_URL: sqlite:////data/route53.db
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
+      # macOS bind mounts don't forward file-change events into the VM.
+      WATCHFILES_FORCE_POLLING: "true"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/srv/app
+      - backend-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    env_file:
+      - path: ./frontend/.env.example
+      - path: ./frontend/.env.local
+        required: false
+    environment:
+      # Inside the Compose network the backend is reached by service name.
+      BACKEND_URL: http://backend:8000
+      WATCHPACK_POLLING: "true"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      # Keep the Linux-built dependencies and build cache from the image,
+      # rather than the host's macOS copies.
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  backend-data:
