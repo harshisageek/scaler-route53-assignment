@@ -1,0 +1,39 @@
+# Secrets: only .env.example is tracked
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
+backend/data/
+
+# Node
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
