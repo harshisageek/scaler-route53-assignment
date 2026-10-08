@@ -24,6 +24,7 @@ import type {
   RoutingPolicy,
 } from '@/lib/api/types';
 import { useRecordSets } from './api';
+import { BindImportModal } from './BindImportModal';
 import { DeleteRecordSetModal } from './DeleteRecordSetModal';
 import { RecordSetModal } from './RecordSetModal';
 import { RECORD_TYPES } from './recordTypes';
@@ -154,6 +155,7 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<RecordSet>();
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const params = useMemo(() => {
@@ -285,6 +287,7 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
                 >
                   Delete
                 </Button>
+                <Button onClick={() => setImporting(true)}>Import records</Button>
                 <Button variant="primary" onClick={() => setCreating(true)}>
                   Create record
                 </Button>
@@ -302,6 +305,9 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
           records={data?.items ?? []}
           onDismiss={() => setCreating(false)}
         />
+      )}
+      {importing && (
+        <BindImportModal zoneId={zoneId} onDismiss={() => setImporting(false)} />
       )}
       {selected && editing && (
         <RecordSetModal

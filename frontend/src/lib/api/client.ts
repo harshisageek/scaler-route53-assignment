@@ -46,3 +46,16 @@ export async function apiRequest<TResponse>(
 
   return (await response.json()) as TResponse;
 }
+
+export async function apiUpload<TResponse>(path: string, file: File): Promise<TResponse> {
+  const body = new FormData();
+  body.append('file', file);
+  const response = await fetch(buildUrl(path), {
+    method: 'POST',
+    credentials: 'same-origin',
+    body,
+  });
+
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as TResponse;
+}

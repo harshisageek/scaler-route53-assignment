@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { hostedZoneKeys } from '@/features/hosted-zones/api';
-import { apiRequest } from '@/lib/api/client';
+import { apiRequest, apiUpload } from '@/lib/api/client';
 import type {
+  BindImportPreview,
+  BindImportResult,
   RecordSet,
   RecordSetCreate,
   RecordSetList,
@@ -71,6 +73,22 @@ export function useDeleteRecordSet(zoneId: string, recordSetId: number) {
   return useMutation({
     mutationFn: () =>
       apiRequest<void>(`${path(zoneId)}/${recordSetId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  });
+}
+
+export function usePreviewBindImport(zoneId: string) {
+  return useMutation({
+    mutationFn: (file: File) =>
+      apiUpload<BindImportPreview>(`${path(zoneId)}/import/preview`, file),
+  });
+}
+
+export function useApplyBindImport(zoneId: string) {
+  const invalidate = useInvalidateRecords(zoneId);
+  return useMutation({
+    mutationFn: (file: File) =>
+      apiUpload<BindImportResult>(`${path(zoneId)}/import`, file),
     onSuccess: invalidate,
   });
 }

@@ -176,3 +176,34 @@ test('an apex alias can route to a mocked AWS target', async ({ page }) => {
     }),
   ).toBeVisible();
 });
+
+test('a BIND zone file can be previewed and imported', async ({ page }) => {
+  await signUp(page, uniqueEmail());
+  const created = await page.request.post('/api/v1/hosted-zones', {
+    data: { name: 'import.example.com' },
+  });
+  const zone = (await created.json()) as { id: string };
+  await page.goto(`/route53/hosted-zones/${zone.id}`);
+
+  await page.getByRole('button', { name: 'Import records' }).click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Import records from a BIND file',
+  });
+  await dialog.locator('input[type="file"]').setInputFiles({
+    name: 'import.zone',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('$ORIGIN import.example.com.\n$TTL 300\nwww IN A 192.0.2.55\n'),
+  });
+  await dialog.getByRole('button', { name: 'Preview' }).click();
+
+  await expect(dialog.getByText('www.import.example.com.')).toBeVisible();
+  await expect(dialog.getByText('To add', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Import records' }).click();
+
+  await expect(page.getByText('1 record set imported successfully.')).toBeVisible();
+  await expect(
+    page.getByRole('row', {
+      name: /www\.import\.example\.com.*A.*192\.0\.2\.55/,
+    }),
+  ).toBeVisible();
+});
