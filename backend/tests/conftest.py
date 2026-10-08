@@ -4,7 +4,7 @@ Each test gets a throwaway SQLite file, so a test never sees state left
 behind by another one.
 """
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 
 import pytest
@@ -60,3 +60,36 @@ def app(settings: Settings, db_session: Session) -> Generator[FastAPI]:
 def client(app: FastAPI) -> Generator[TestClient]:
     with TestClient(app) as test_client:
         yield test_client
+
+
+PASSWORD = "correct horse battery staple"
+
+
+@pytest.fixture
+def make_client(app: FastAPI) -> Generator[Callable[[], TestClient]]:
+    """Build extra clients, each with its own cookie jar: one per simulated user."""
+    clients: list[TestClient] = []
+
+    def build() -> TestClient:
+        clients.append(TestClient(app))
+        return clients[-1]
+
+    yield build
+    for test_client in clients:
+        test_client.close()
+
+
+def sign_up(client: TestClient, email: str, password: str = PASSWORD) -> TestClient:
+    response = client.post("/api/v1/auth/sign-up", json={"email": email, "password": password})
+    assert response.status_code == 201, response.text
+    return client
+
+
+@pytest.fixture
+def alice(make_client: Callable[[], TestClient]) -> TestClient:
+    return sign_up(make_client(), "alice@example.com")
+
+
+@pytest.fixture
+def bob(make_client: Callable[[], TestClient]) -> TestClient:
+    return sign_up(make_client(), "bob@example.com")

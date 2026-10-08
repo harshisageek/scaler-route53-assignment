@@ -12,7 +12,8 @@ from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.db.session import create_db_engine
-from app.services.seed import seed_demo_data
+from app.services.demo import ensure_demo_account
+from app.services.login_throttle import LoginThrottle
 
 DESCRIPTION = """
 A clone of the AWS Route 53 console: hosted zones and DNS records, with the
@@ -25,11 +26,13 @@ def _seed_on_startup(settings: Settings) -> None:
     engine = create_db_engine(settings)
     try:
         with Session(engine) as db:
-            added = seed_demo_data(db)
-            db.commit()
+            user = ensure_demo_account(db, settings)
+            reset_at = user.demo_data_reset_at
     finally:
         engine.dispose()
-    get_logger(__name__).info("seed.completed", zones_added=added)
+    get_logger(__name__).info(
+        "demo.ready", data_reset_at=reset_at.isoformat() if reset_at else None
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -50,6 +53,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         openapi_url="/openapi.json",
         lifespan=lifespan,
     )
+    app.state.login_throttle = LoginThrottle(*settings.login_attempts_per_window)
 
     # Local development only: in production Next.js proxies /api/* so the
     # browser never makes a cross-origin request.
