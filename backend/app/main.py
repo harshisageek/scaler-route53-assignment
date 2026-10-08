@@ -1,0 +1,48 @@
+"""FastAPI application factory."""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.api.v1.router import api_router
+from app.core.config import Settings, get_settings
+from app.core.errors import register_exception_handlers
+from app.core.logging import configure_logging, get_logger
+
+DESCRIPTION = """
+A clone of the AWS Route 53 console: hosted zones and DNS records, with the
+same workflows and validation rules as the real service. It stores records,
+it does not answer DNS queries.
+"""
+
+
+def create_app(settings: Settings | None = None) -> FastAPI:
+    settings = settings or get_settings()
+    configure_logging(settings)
+
+    app = FastAPI(
+        title="Route 53 Clone API",
+        description=DESCRIPTION,
+        version="1.0.0",
+        docs_url="/docs",
+        openapi_url="/openapi.json",
+    )
+
+    # Local development only: in production Next.js proxies /api/* so the
+    # browser never makes a cross-origin request.
+    if not settings.is_production:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.cors_allowed_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+    register_exception_handlers(app)
+    app.include_router(api_router)
+
+    get_logger(__name__).info("app.started", environment=settings.app_env)
+    return app
+
+
+app = create_app()

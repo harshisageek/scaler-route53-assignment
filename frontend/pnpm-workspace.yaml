@@ -1,0 +1,4 @@
+allowBuilds:
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@cloudscape-design/components@3.0.1393'
