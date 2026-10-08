@@ -23,6 +23,10 @@ const RECORD: RecordSet = {
   failover_role: null,
   region: null,
   geolocation: null,
+  alias: false,
+  alias_target_type: null,
+  alias_target: null,
+  evaluate_target_health: false,
   created_at: '2026-10-08T12:00:00Z',
   updated_at: '2026-10-08T12:00:00Z',
 };
@@ -33,6 +37,12 @@ const SIMPLE_ROUTING = {
   failover_role: null,
   region: null,
   geolocation: null,
+} as const;
+const NOT_AN_ALIAS = {
+  alias: false,
+  alias_target_type: null,
+  alias_target: null,
+  evaluate_target_health: false,
 } as const;
 
 function jsonResponse(status: number, body?: unknown): Response {
@@ -87,8 +97,62 @@ describe('RecordSetModal', () => {
           ttl: 300,
           values: ['192.0.2.1', '192.0.2.2'],
           ...SIMPLE_ROUTING,
+          ...NOT_AN_ALIAS,
         }),
       }),
+    );
+  });
+
+  it('creates an apex alias to a mocked AWS target', async () => {
+    const saved: RecordSet = {
+      ...RECORD,
+      name: 'example.com.',
+      ttl: null,
+      values: [],
+      alias: true,
+      alias_target_type: 'cloudfront',
+      alias_target: 'd111111abcdef8.cloudfront.net.',
+      evaluate_target_health: true,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, saved));
+    vi.stubGlobal('fetch', fetchMock);
+    renderModal(
+      <RecordSetModal zoneId="Z1" zoneName="example.com" onDismiss={vi.fn()} />,
+    );
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Alias' }));
+    await userEvent.click(screen.getByRole('button', { name: /Choose an endpoint/ }));
+    await userEvent.click(
+      screen.getByRole('option', { name: /CloudFront distribution/ }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Choose a target/ }));
+    await userEvent.click(
+      screen.getByRole('option', {
+        name: 'd111111abcdef8.cloudfront.net.',
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: 'Evaluate target health' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Create record' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/hosted-zones/Z1/records',
+        expect.objectContaining({
+          body: JSON.stringify({
+            name: '',
+            type: 'A',
+            ttl: null,
+            values: [],
+            ...SIMPLE_ROUTING,
+            alias: true,
+            alias_target_type: 'cloudfront',
+            alias_target: 'd111111abcdef8.cloudfront.net.',
+            evaluate_target_health: true,
+          }),
+        }),
+      ),
     );
   });
 
@@ -130,6 +194,7 @@ describe('RecordSetModal', () => {
             failover_role: null,
             region: null,
             geolocation: null,
+            ...NOT_AN_ALIAS,
           }),
         }),
       ),
@@ -169,6 +234,7 @@ describe('RecordSetModal', () => {
             ttl: 60,
             values: ['192.0.2.9'],
             ...SIMPLE_ROUTING,
+            ...NOT_AN_ALIAS,
           }),
         }),
       ),

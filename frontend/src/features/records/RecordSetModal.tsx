@@ -9,17 +9,20 @@ import Modal from '@cloudscape-design/components/modal';
 import Select, { type SelectProps } from '@cloudscape-design/components/select';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import Textarea from '@cloudscape-design/components/textarea';
+import Toggle from '@cloudscape-design/components/toggle';
 import { useState } from 'react';
 import { AWS_REGIONS } from '@/features/hosted-zones/regions';
 import { useFlash } from '@/features/shell/flash';
 import { fieldErrorsFrom } from '@/lib/api/fieldErrors';
 import type {
+  AliasTargetType,
   EditableRecordType,
   FailoverRole,
   RecordSet,
   RoutingPolicy,
 } from '@/lib/api/types';
 import { useCreateRecordSet, useUpdateRecordSet } from './api';
+import { ALIAS_TARGET_TYPE_OPTIONS, aliasTargetOptions } from './aliasTargets';
 import { EDITABLE_RECORD_TYPES, RECORD_TYPE_HINTS } from './recordTypes';
 import {
   FAILOVER_OPTIONS,
@@ -43,11 +46,18 @@ const REGION_OPTIONS: SelectProps.Option[] = AWS_REGIONS.map((region) => ({
 interface Props {
   zoneId: string;
   zoneName: string;
+  records?: RecordSet[];
   record?: RecordSet;
   onDismiss: () => void;
 }
 
-export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
+export function RecordSetModal({
+  zoneId,
+  zoneName,
+  records = [],
+  record,
+  onDismiss,
+}: Props) {
   const editing = record !== undefined;
   const notify = useFlash();
   const create = useCreateRecordSet(zoneId);
@@ -69,8 +79,17 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
   );
   const [region, setRegion] = useState(record?.region ?? '');
   const [geolocation, setGeolocation] = useState(record?.geolocation ?? '');
+  const [alias, setAlias] = useState(record?.alias ?? false);
+  const [aliasTargetType, setAliasTargetType] = useState<AliasTargetType | null>(
+    record?.alias_target_type ?? null,
+  );
+  const [aliasTarget, setAliasTarget] = useState(record?.alias_target ?? '');
+  const [evaluateTargetHealth, setEvaluateTargetHealth] = useState(
+    record?.evaluate_target_health ?? false,
+  );
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const fieldErrors = fieldErrorsFrom(mutation.error);
+  const targetOptions = aliasTargetOptions(aliasTargetType, records, type, record?.id);
 
   const submit = () => {
     const errors: Record<string, string> = {};
@@ -79,17 +98,23 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
       .split('\n')
       .map((value) => value.trim())
       .filter(Boolean);
-    if (!Number.isInteger(parsedTtl) || parsedTtl < 0 || parsedTtl > TTL_MAX) {
+    if (
+      !alias &&
+      (!Number.isInteger(parsedTtl) || parsedTtl < 0 || parsedTtl > TTL_MAX)
+    ) {
       errors.ttl = `Enter a whole number from 0 to ${TTL_MAX}.`;
     }
-    if (parsedValues.length === 0) {
+    if (!alias && parsedValues.length === 0) {
       errors.values = 'Enter at least one value.';
     }
-    if (type === 'CNAME' && parsedValues.length !== 1) {
+    if (!alias && type === 'CNAME' && parsedValues.length !== 1) {
       errors.values = 'A CNAME record must have exactly one value.';
     }
-    if (type === 'CNAME' && (!name.trim() || name.trim() === '@')) {
+    if (!alias && type === 'CNAME' && (!name.trim() || name.trim() === '@')) {
       errors.name = 'A CNAME record cannot be created at the zone apex.';
+    }
+    if (alias && (!aliasTargetType || !aliasTarget)) {
+      errors.alias_target = 'Choose an alias target.';
     }
     const requiresIdentifier = [
       'weighted',
@@ -123,14 +148,18 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
       {
         name,
         type,
-        ttl: parsedTtl,
-        values: parsedValues,
+        ttl: alias ? null : parsedTtl,
+        values: alias ? [] : parsedValues,
         routing_policy: routingPolicy,
         set_identifier: requiresIdentifier ? setIdentifier.trim() : null,
         weight: routingPolicy === 'weighted' ? parsedWeight : null,
         failover_role: routingPolicy === 'failover' ? failoverRole : null,
         region: routingPolicy === 'latency' ? region : null,
         geolocation: routingPolicy === 'geolocation' ? geolocation : null,
+        alias,
+        alias_target_type: alias ? aliasTargetType : null,
+        alias_target: alias ? aliasTarget : null,
+        evaluate_target_health: alias && evaluateTargetHealth,
       },
       {
         onSuccess: (saved) => {
@@ -185,9 +214,16 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
             selectedOption={TYPE_OPTIONS.find((option) => option.value === type) ?? null}
             options={TYPE_OPTIONS}
             disabled={editing}
-            onChange={({ detail }) =>
-              setType(detail.selectedOption.value as EditableRecordType)
-            }
+            onChange={({ detail }) => {
+              const selectedType = detail.selectedOption.value as EditableRecordType;
+              setType(selectedType);
+              if (!['A', 'AAAA'].includes(selectedType)) {
+                setAlias(false);
+                setAliasTargetType(null);
+                setAliasTarget('');
+                setEvaluateTargetHealth(false);
+              }
+            }}
           />
         </FormField>
         <FormField
@@ -207,6 +243,78 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
             }}
           />
         </FormField>
+        <Toggle
+          checked={alias}
+          disabled={!['A', 'AAAA'].includes(type)}
+          onChange={({ detail }) => {
+            setAlias(detail.checked);
+            setClientErrors({});
+            if (!detail.checked) {
+              setAliasTargetType(null);
+              setAliasTarget('');
+              setEvaluateTargetHealth(false);
+            }
+          }}
+        >
+          Alias
+        </Toggle>
+        {alias && (
+          <>
+            <FormField
+              label="Route traffic to"
+              description="Choose a mocked AWS resource or another record in this zone."
+              errorText={clientErrors.alias_target ?? fieldErrors.alias_target_type}
+            >
+              <Select
+                selectedOption={
+                  ALIAS_TARGET_TYPE_OPTIONS.find(
+                    (option) => option.value === aliasTargetType,
+                  ) ?? null
+                }
+                options={ALIAS_TARGET_TYPE_OPTIONS}
+                placeholder="Choose an endpoint"
+                onChange={({ detail }) => {
+                  setAliasTargetType(detail.selectedOption.value as AliasTargetType);
+                  setAliasTarget('');
+                  setClientErrors((current) => ({
+                    ...current,
+                    alias_target: '',
+                  }));
+                }}
+              />
+            </FormField>
+            <FormField
+              label="Alias target"
+              errorText={clientErrors.alias_target ?? fieldErrors.alias_target}
+            >
+              <Select
+                selectedOption={
+                  targetOptions.find((option) => option.value === aliasTarget) ?? null
+                }
+                options={targetOptions}
+                placeholder={
+                  aliasTargetType === 'record' && targetOptions.length === 0
+                    ? `No eligible ${type} records`
+                    : 'Choose a target'
+                }
+                empty="No eligible records"
+                onChange={({ detail }) => {
+                  setAliasTarget(detail.selectedOption.value ?? '');
+                  setClientErrors((current) => ({
+                    ...current,
+                    alias_target: '',
+                  }));
+                }}
+              />
+            </FormField>
+            <Toggle
+              checked={evaluateTargetHealth}
+              onChange={({ detail }) => setEvaluateTargetHealth(detail.checked)}
+            >
+              Evaluate target health
+            </Toggle>
+          </>
+        )}
         {['weighted', 'failover', 'latency', 'geolocation'].includes(routingPolicy) && (
           <FormField
             label="Set identifier"
@@ -296,36 +404,40 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
             />
           </FormField>
         )}
-        <FormField
-          label="Value"
-          description={`${RECORD_TYPE_HINTS[type]}. Enter multiple values on separate lines.`}
-          errorText={clientErrors.values ?? fieldErrors.values}
-        >
-          <Textarea
-            value={values}
-            rows={5}
-            placeholder={RECORD_TYPE_HINTS[type]}
-            onChange={({ detail }) => {
-              setValues(detail.value);
-              setClientErrors((current) => ({ ...current, values: '' }));
-            }}
-          />
-        </FormField>
-        <FormField
-          label="TTL (seconds)"
-          description="How long resolvers cache this record."
-          errorText={clientErrors.ttl ?? fieldErrors.ttl}
-        >
-          <Input
-            value={ttl}
-            type="number"
-            inputMode="numeric"
-            onChange={({ detail }) => {
-              setTtl(detail.value);
-              setClientErrors((current) => ({ ...current, ttl: '' }));
-            }}
-          />
-        </FormField>
+        {!alias && (
+          <>
+            <FormField
+              label="Value"
+              description={`${RECORD_TYPE_HINTS[type]}. Enter multiple values on separate lines.`}
+              errorText={clientErrors.values ?? fieldErrors.values}
+            >
+              <Textarea
+                value={values}
+                rows={5}
+                placeholder={RECORD_TYPE_HINTS[type]}
+                onChange={({ detail }) => {
+                  setValues(detail.value);
+                  setClientErrors((current) => ({ ...current, values: '' }));
+                }}
+              />
+            </FormField>
+            <FormField
+              label="TTL (seconds)"
+              description="How long resolvers cache this record."
+              errorText={clientErrors.ttl ?? fieldErrors.ttl}
+            >
+              <Input
+                value={ttl}
+                type="number"
+                inputMode="numeric"
+                onChange={({ detail }) => {
+                  setTtl(detail.value);
+                  setClientErrors((current) => ({ ...current, ttl: '' }));
+                }}
+              />
+            </FormField>
+          </>
+        )}
         {mutation.error && Object.keys(fieldErrors).length === 0 && (
           <Alert
             type="error"

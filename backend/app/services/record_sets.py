@@ -4,6 +4,7 @@ from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.models import HostedZone, RecordSet, User
 from app.repositories import hosted_zones, record_sets
 from app.schemas.record_set import (
+    AliasTargetType,
     EditableRecordType,
     RecordSetCreate,
     RecordSetList,
@@ -11,6 +12,7 @@ from app.schemas.record_set import (
     RecordSetOut,
     RecordSetUpdate,
 )
+from app.services.alias_targets import MOCK_ALIAS_TARGETS
 from app.services.validation.domain_names import InvalidDomainNameError, normalize_record_name
 from app.services.validation.record_values import (
     InvalidRecordValueError,
@@ -50,7 +52,8 @@ def create_record_set(
 ) -> RecordSetOut:
     zone = _owned_zone(db, owner, zone_id)
     name = _record_name(request.name, zone.name)
-    values = _record_values(request.type, request.values)
+    values = [] if request.alias else _record_values(request.type, request.values)
+    alias_target = _alias_target(db, zone, name, request)
     set_identifier = request.set_identifier or ""
     _ensure_cname_compatible(db, zone, name, request.type)
     _ensure_policy_compatible(
@@ -79,6 +82,10 @@ def create_record_set(
         failover_role=request.failover_role,
         region=request.region,
         geolocation=request.geolocation,
+        alias=request.alias,
+        alias_target_type=request.alias_target_type,
+        alias_target=alias_target,
+        evaluate_target_health=request.evaluate_target_health,
     )
     db.add(record)
     db.commit()
@@ -97,7 +104,14 @@ def update_record_set(
     record = _record_set(db, zone, record_set_id)
     _protect_default_record(zone, record)
     name = _record_name(request.name, zone.name)
-    values = _record_values(request.type, request.values)
+    values = [] if request.alias else _record_values(request.type, request.values)
+    alias_target = _alias_target(
+        db,
+        zone,
+        name,
+        request,
+        exclude_id=record.id,
+    )
     set_identifier = request.set_identifier or ""
     _ensure_cname_compatible(db, zone, name, request.type, exclude_id=record.id)
     _ensure_policy_compatible(
@@ -126,6 +140,10 @@ def update_record_set(
     record.failover_role = request.failover_role
     record.region = request.region
     record.geolocation = request.geolocation
+    record.alias = request.alias
+    record.alias_target_type = request.alias_target_type
+    record.alias_target = alias_target
+    record.evaluate_target_health = request.evaluate_target_health
     db.commit()
     db.refresh(record)
     return RecordSetOut.model_validate(record)
@@ -177,6 +195,69 @@ def _record_values(record_type: EditableRecordType, values: list[str]) -> list[s
             "One or more fields are invalid.",
             {"fields": [{"loc": ["body", "values"], "msg": str(exc)}]},
         ) from exc
+
+
+def _alias_target(
+    db: Session,
+    zone: HostedZone,
+    record_name: str,
+    request: RecordSetCreate | RecordSetUpdate,
+    *,
+    exclude_id: int | None = None,
+) -> str | None:
+    if not request.alias:
+        return None
+    assert request.alias_target_type is not None
+    assert request.alias_target is not None
+    target_type: AliasTargetType = request.alias_target_type
+    target = request.alias_target.lower()
+    if target_type != "record":
+        if target not in MOCK_ALIAS_TARGETS[target_type]:
+            raise ValidationFailedError(
+                "One or more fields are invalid.",
+                {
+                    "fields": [
+                        {
+                            "loc": ["body", "alias_target"],
+                            "msg": "Choose one of the available mocked AWS targets.",
+                        }
+                    ]
+                },
+            )
+        return target
+
+    target_name = _record_name(target, zone.name)
+    if target_name == record_name:
+        raise ValidationFailedError(
+            "One or more fields are invalid.",
+            {
+                "fields": [
+                    {
+                        "loc": ["body", "alias_target"],
+                        "msg": "An alias record cannot target itself.",
+                    }
+                ]
+            },
+        )
+    target_types = record_sets.types_for_name(
+        db,
+        zone.id,
+        target_name,
+        exclude_id=exclude_id,
+    )
+    if request.type not in target_types:
+        raise ValidationFailedError(
+            "One or more fields are invalid.",
+            {
+                "fields": [
+                    {
+                        "loc": ["body", "alias_target"],
+                        "msg": f"Choose an existing {request.type} record in this hosted zone.",
+                    }
+                ]
+            },
+        )
+    return target_name
 
 
 def _ensure_cname_compatible(

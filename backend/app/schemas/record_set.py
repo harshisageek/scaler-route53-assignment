@@ -11,6 +11,7 @@ EditableRecordType = Literal["A", "AAAA", "CNAME", "TXT", "MX", "NS", "PTR", "SR
 RecordSetSort = Literal["name", "-name", "type", "-type", "ttl", "-ttl"]
 RoutingPolicy = Literal["simple", "weighted", "failover", "latency", "geolocation", "multivalue"]
 FailoverRole = Literal["PRIMARY", "SECONDARY"]
+AliasTargetType = Literal["cloudfront", "s3-website", "load-balancer", "api-gateway", "record"]
 
 
 class RecordSetInput(BaseModel):
@@ -22,14 +23,18 @@ class RecordSetInput(BaseModel):
         examples=["www"],
     )
     type: EditableRecordType
-    ttl: int = Field(ge=0, le=TTL_MAX, examples=[300])
-    values: list[str] = Field(min_length=1, max_length=100)
+    ttl: int | None = Field(ge=0, le=TTL_MAX, examples=[300])
+    values: list[str] = Field(max_length=100)
     routing_policy: RoutingPolicy = "simple"
     set_identifier: str | None = Field(default=None, min_length=1, max_length=128)
     weight: int | None = Field(default=None, ge=0, le=255)
     failover_role: FailoverRole | None = None
     region: str | None = Field(default=None, max_length=32)
     geolocation: str | None = Field(default=None, max_length=64)
+    alias: bool = False
+    alias_target_type: AliasTargetType | None = None
+    alias_target: str | None = Field(default=None, min_length=1, max_length=255)
+    evaluate_target_health: bool = False
 
     @field_validator("values")
     @classmethod
@@ -41,13 +46,28 @@ class RecordSetInput(BaseModel):
             raise ValueError("A record value can have at most 4096 characters.")
         return cleaned
 
-    @field_validator("set_identifier", "geolocation")
+    @field_validator("set_identifier", "geolocation", "alias_target")
     @classmethod
     def _trim_optional_text(cls, value: str | None) -> str | None:
         return value.strip() if value is not None else None
 
     @model_validator(mode="after")
     def _policy_fields_match(self) -> Self:
+        if self.alias:
+            if self.type not in {"A", "AAAA"}:
+                raise ValueError("Alias records must use the A or AAAA record type.")
+            if self.ttl is not None or self.values:
+                raise ValueError("Alias records do not use TTL or record values.")
+            if self.alias_target_type is None or not self.alias_target:
+                raise ValueError("Alias records require a target type and target.")
+        else:
+            if self.ttl is None or not self.values:
+                raise ValueError("Non-alias records require TTL and at least one value.")
+            if self.alias_target_type is not None or self.alias_target is not None:
+                raise ValueError("Non-alias records do not use alias target fields.")
+            if self.evaluate_target_health:
+                raise ValueError("Evaluate target health can only be enabled for alias records.")
+
         requires_identifier = self.routing_policy in {
             "weighted",
             "failover",
@@ -100,7 +120,7 @@ class RecordSetOut(BaseModel):
     id: int
     name: str
     type: RecordType
-    ttl: int
+    ttl: int | None
     values: list[str]
     routing_policy: RoutingPolicy
     set_identifier: str | None
@@ -108,6 +128,10 @@ class RecordSetOut(BaseModel):
     failover_role: FailoverRole | None
     region: str | None
     geolocation: str | None
+    alias: bool
+    alias_target_type: AliasTargetType | None
+    alias_target: str | None
+    evaluate_target_health: bool
     created_at: datetime
     updated_at: datetime
 

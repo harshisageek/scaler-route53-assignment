@@ -27,6 +27,10 @@ const RECORDS: RecordSetList = {
       failover_role: null,
       region: null,
       geolocation: null,
+      alias: false,
+      alias_target_type: null,
+      alias_target: null,
+      evaluate_target_health: false,
       created_at: '2026-10-08T12:00:00Z',
       updated_at: '2026-10-08T12:00:00Z',
     },
@@ -42,6 +46,10 @@ const RECORDS: RecordSetList = {
       failover_role: null,
       region: null,
       geolocation: null,
+      alias: false,
+      alias_target_type: null,
+      alias_target: null,
+      evaluate_target_health: false,
       created_at: '2026-10-08T12:00:00Z',
       updated_at: '2026-10-08T12:00:00Z',
     },
@@ -78,6 +86,33 @@ describe('RecordSetsTable', () => {
     expect(screen.getByText('192.0.2.1')).toBeInTheDocument();
     expect(screen.getByText('TTL (seconds)')).toBeInTheDocument();
     expect(screen.getByText('(2)')).toBeInTheDocument();
+  });
+
+  it('shows an alias target and its health-evaluation setting', async () => {
+    const baseRecord = RECORDS.items[1];
+    if (!baseRecord) throw new Error('The record fixture is missing.');
+    const aliasRecords: RecordSetList = {
+      ...RECORDS,
+      total: 1,
+      items: [
+        {
+          ...baseRecord,
+          ttl: null,
+          values: [],
+          alias: true,
+          alias_target_type: 'cloudfront',
+          alias_target: 'd111111abcdef8.cloudfront.net.',
+          evaluate_target_health: true,
+        },
+      ],
+    };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, aliasRecords)));
+    renderTable();
+
+    expect(
+      await screen.findByText('Alias to d111111abcdef8.cloudfront.net.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Evaluate target health: Yes')).toBeInTheDocument();
   });
 
   it('searches and sorts on the server', async () => {
