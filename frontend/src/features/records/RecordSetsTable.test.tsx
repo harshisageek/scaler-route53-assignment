@@ -169,7 +169,7 @@ describe('RecordSetsTable', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     const wwwRow = screen.getByRole('row', { name: /www\.example\.com/ });
-    await userEvent.click(within(wwwRow).getByRole('radio'));
+    await userEvent.click(within(wwwRow).getByRole('checkbox'));
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     expect(screen.getByRole('dialog', { name: 'Edit record' })).toBeInTheDocument();
   });
@@ -180,7 +180,7 @@ describe('RecordSetsTable', () => {
     await screen.findByText('www.example.com.');
 
     const nsRow = screen.getByRole('row', { name: /example\.com\..*NS/ });
-    await userEvent.click(within(nsRow).getByRole('radio'));
+    await userEvent.click(within(nsRow).getByRole('checkbox'));
 
     expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
@@ -199,7 +199,7 @@ describe('RecordSetsTable', () => {
     await screen.findByText('www.example.com.');
 
     const wwwRow = screen.getByRole('row', { name: /www\.example\.com/ });
-    await userEvent.click(within(wwwRow).getByRole('radio'));
+    await userEvent.click(within(wwwRow).getByRole('checkbox'));
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
     const dialog = screen.getByRole('dialog', { name: 'Delete record' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
@@ -207,5 +207,56 @@ describe('RecordSetsTable', () => {
     expect(
       await screen.findByText('www.example.com. A was successfully deleted.'),
     ).toBeInTheDocument();
+  });
+
+  it('deletes multiple selected records in one change batch', async () => {
+    const first = RECORDS.items[1];
+    if (!first) throw new Error('The record fixture is missing.');
+    const second = {
+      ...first,
+      id: 4,
+      name: 'api.example.com.',
+      values: ['192.0.2.2'],
+    };
+    const records = { ...RECORDS, items: [first, second] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, records))
+      .mockResolvedValueOnce(jsonResponse(200, { applied_count: 2 }))
+      .mockResolvedValue(jsonResponse(200, { ...RECORDS, total: 0, items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderTable();
+    await screen.findByText('api.example.com.');
+
+    await userEvent.click(
+      within(screen.getByRole('row', { name: /www\.example\.com/ })).getByRole(
+        'checkbox',
+      ),
+    );
+    await userEvent.click(
+      within(screen.getByRole('row', { name: /api\.example\.com/ })).getByRole(
+        'checkbox',
+      ),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Delete (2)' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete 2 record sets' });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete record sets' }),
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/hosted-zones/Z1/records:batch',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            changes: [
+              { action: 'DELETE', record_set_id: 3, record_set: null },
+              { action: 'DELETE', record_set_id: 4, record_set: null },
+            ],
+          }),
+        }),
+      ),
+    );
   });
 });

@@ -106,6 +106,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hosted-zones/{zone_id}/records:batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Record Set Change Batch */
+        post: operations["apply_record_set_change_batch_api_v1_hosted_zones__zone_id__records_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hosted-zones:batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Hosted Zone Batch */
+        post: operations["delete_hosted_zone_batch_api_v1_hosted_zones_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hosted-zones": {
         parameters: {
             query?: never;
@@ -235,6 +269,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BatchResult */
+        BatchResult: {
+            /** Applied Count */
+            applied_count: number;
+        };
         /** BindImportPreview */
         BindImportPreview: {
             /** File Name */
@@ -330,6 +369,16 @@ export interface components {
             vpc?: components["schemas"]["Vpc"] | null;
             /** Tags */
             tags?: components["schemas"]["HostedZoneTag"][];
+        };
+        /** HostedZoneDeleteBatch */
+        HostedZoneDeleteBatch: {
+            /** Hosted Zone Ids */
+            hosted_zone_ids: string[];
+        };
+        /** HostedZoneDeleteResult */
+        HostedZoneDeleteResult: {
+            /** Deleted Count */
+            deleted_count: number;
         };
         /**
          * HostedZoneDetail
@@ -461,8 +510,75 @@ export interface components {
             /** Tags */
             tags?: components["schemas"]["HostedZoneTag"][] | null;
         };
+        /** RecordSetChange */
+        RecordSetChange: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "CREATE" | "UPSERT" | "DELETE";
+            /** Record Set Id */
+            record_set_id?: number | null;
+            record_set?: components["schemas"]["RecordSetInput"] | null;
+        };
+        /** RecordSetChangeBatch */
+        RecordSetChangeBatch: {
+            /** Changes */
+            changes: components["schemas"]["RecordSetChange"][];
+        };
         /** RecordSetCreate */
         RecordSetCreate: {
+            /**
+             * Name
+             * @description A name relative to the zone, an absolute name, or @ for the zone apex.
+             * @example www
+             */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA";
+            /**
+             * Ttl
+             * @example 300
+             */
+            ttl: number | null;
+            /** Values */
+            values: string[];
+            /**
+             * Routing Policy
+             * @default simple
+             * @enum {string}
+             */
+            routing_policy: "simple" | "weighted" | "failover" | "latency" | "geolocation" | "multivalue";
+            /** Set Identifier */
+            set_identifier?: string | null;
+            /** Weight */
+            weight?: number | null;
+            /** Failover Role */
+            failover_role?: ("PRIMARY" | "SECONDARY") | null;
+            /** Region */
+            region?: string | null;
+            /** Geolocation */
+            geolocation?: string | null;
+            /**
+             * Alias
+             * @default false
+             */
+            alias: boolean;
+            /** Alias Target Type */
+            alias_target_type?: ("cloudfront" | "s3-website" | "load-balancer" | "api-gateway" | "record") | null;
+            /** Alias Target */
+            alias_target?: string | null;
+            /**
+             * Evaluate Target Health
+             * @default false
+             */
+            evaluate_target_health: boolean;
+        };
+        /** RecordSetInput */
+        RecordSetInput: {
             /**
              * Name
              * @description A name relative to the zone, an absolute name, or @ for the zone apex.
@@ -845,6 +961,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    apply_record_set_change_batch_api_v1_hosted_zones__zone_id__records_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordSetChangeBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_hosted_zone_batch_api_v1_hosted_zones_batch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostedZoneDeleteBatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostedZoneDeleteResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

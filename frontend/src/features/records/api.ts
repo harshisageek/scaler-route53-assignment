@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { hostedZoneKeys } from '@/features/hosted-zones/api';
 import { apiRequest, apiUpload } from '@/lib/api/client';
 import type {
+  BatchResult,
   BindImportPreview,
   BindImportResult,
   RecordSet,
+  RecordSetChangeBatch,
   RecordSetCreate,
   RecordSetList,
   RecordSetListParams,
@@ -89,6 +91,18 @@ export function useApplyBindImport(zoneId: string) {
   return useMutation({
     mutationFn: (file: File) =>
       apiUpload<BindImportResult>(`${path(zoneId)}/import`, file),
+    onSuccess: invalidate,
+  });
+}
+
+export function useRecordSetChangeBatch(zoneId: string) {
+  const invalidate = useInvalidateRecords(zoneId);
+  return useMutation({
+    mutationFn: (body: RecordSetChangeBatch) =>
+      apiRequest<BatchResult>(
+        `/hosted-zones/${encodeURIComponent(zoneId)}/records:batch`,
+        { method: 'POST', body },
+      ),
     onSuccess: invalidate,
   });
 }

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.models import HostedZone, RecordSet, User
 from app.repositories import hosted_zones, record_sets
+from app.schemas.bulk import BatchResult, RecordSetChangeBatch
 from app.schemas.record_set import (
     AliasTargetType,
     EditableRecordType,
@@ -48,7 +49,12 @@ def get_record_set(db: Session, owner: User, zone_id: str, record_set_id: int) -
 
 
 def create_record_set(
-    db: Session, owner: User, zone_id: str, request: RecordSetCreate
+    db: Session,
+    owner: User,
+    zone_id: str,
+    request: RecordSetCreate,
+    *,
+    commit: bool = True,
 ) -> RecordSetOut:
     zone = _owned_zone(db, owner, zone_id)
     name = _record_name(request.name, zone.name)
@@ -88,8 +94,11 @@ def create_record_set(
         evaluate_target_health=request.evaluate_target_health,
     )
     db.add(record)
-    db.commit()
-    db.refresh(record)
+    if commit:
+        db.commit()
+        db.refresh(record)
+    else:
+        db.flush()
     return RecordSetOut.model_validate(record)
 
 
@@ -99,6 +108,8 @@ def update_record_set(
     zone_id: str,
     record_set_id: int,
     request: RecordSetUpdate,
+    *,
+    commit: bool = True,
 ) -> RecordSetOut:
     zone = _owned_zone(db, owner, zone_id)
     record = _record_set(db, zone, record_set_id)
@@ -144,17 +155,72 @@ def update_record_set(
     record.alias_target_type = request.alias_target_type
     record.alias_target = alias_target
     record.evaluate_target_health = request.evaluate_target_health
-    db.commit()
-    db.refresh(record)
+    if commit:
+        db.commit()
+        db.refresh(record)
+    else:
+        db.flush()
     return RecordSetOut.model_validate(record)
 
 
-def delete_record_set(db: Session, owner: User, zone_id: str, record_set_id: int) -> None:
+def delete_record_set(
+    db: Session,
+    owner: User,
+    zone_id: str,
+    record_set_id: int,
+    *,
+    commit: bool = True,
+) -> None:
     zone = _owned_zone(db, owner, zone_id)
     record = _record_set(db, zone, record_set_id)
     _protect_default_record(zone, record)
     record_sets.delete_record_set(db, record)
-    db.commit()
+    if commit:
+        db.commit()
+
+
+def apply_change_batch(
+    db: Session,
+    owner: User,
+    zone_id: str,
+    request: RecordSetChangeBatch,
+) -> BatchResult:
+    try:
+        for change in request.changes:
+            if change.action == "CREATE":
+                assert change.record_set is not None
+                create_record_set(
+                    db,
+                    owner,
+                    zone_id,
+                    RecordSetCreate.model_validate(change.record_set.model_dump()),
+                    commit=False,
+                )
+            elif change.action == "UPSERT":
+                assert change.record_set_id is not None
+                assert change.record_set is not None
+                update_record_set(
+                    db,
+                    owner,
+                    zone_id,
+                    change.record_set_id,
+                    RecordSetUpdate.model_validate(change.record_set.model_dump()),
+                    commit=False,
+                )
+            else:
+                assert change.record_set_id is not None
+                delete_record_set(
+                    db,
+                    owner,
+                    zone_id,
+                    change.record_set_id,
+                    commit=False,
+                )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return BatchResult(applied_count=len(request.changes))
 
 
 def _owned_zone(db: Session, owner: User, zone_id: str) -> HostedZone:

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FlashMessages, FlashProvider } from '@/features/shell/flash';
@@ -143,10 +143,59 @@ describe('HostedZonesTable', () => {
     await userEvent.click(screen.getByRole('link', { name: 'Create hosted zone' }));
     expect(router.push).toHaveBeenCalledWith('/route53/hosted-zones/create');
 
-    await userEvent.click(screen.getByRole('radio'));
+    const row = screen.getByRole('link', { name: 'example.com' }).closest('tr');
+    if (!row) throw new Error('Hosted-zone row is missing.');
+    await userEvent.click(within(row).getByRole('checkbox'));
     await userEvent.click(screen.getByRole('button', { name: 'View details' }));
     expect(router.push).toHaveBeenCalledWith(
       '/route53/hosted-zones/Z0812345ABCDEFGHIJKLM',
+    );
+  });
+
+  it('deletes multiple selected hosted zones in one request', async () => {
+    const first = ONE_ZONE.items[0];
+    if (!first) throw new Error('The hosted-zone fixture is missing.');
+    const second = {
+      ...first,
+      id: 'Z0812345SECONDZONE',
+      name: 'second.example.com.',
+      comment: null,
+    };
+    const zones = { ...ONE_ZONE, total: 2, items: [first, second] };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, zones))
+      .mockResolvedValueOnce(jsonResponse(200, { deleted_count: 2 }))
+      .mockResolvedValue(jsonResponse(200, { ...ONE_ZONE, total: 0, items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    renderTable();
+    await screen.findByText('second.example.com');
+
+    const firstRow = screen.getByRole('link', { name: 'example.com' }).closest('tr');
+    const secondRow = screen
+      .getByRole('link', { name: 'second.example.com' })
+      .closest('tr');
+    if (!firstRow || !secondRow) throw new Error('Hosted-zone rows are missing.');
+    await userEvent.click(within(firstRow).getByRole('checkbox'));
+    await userEvent.click(within(secondRow).getByRole('checkbox'));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete (2)' }));
+    const dialog = screen.getByRole('dialog', {
+      name: 'Delete 2 hosted zones',
+    });
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Delete hosted zones' }),
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/hosted-zones:batch',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            hosted_zone_ids: ['Z0812345ABCDEFGHIJKLM', 'Z0812345SECONDZONE'],
+          }),
+        }),
+      ),
     );
   });
 

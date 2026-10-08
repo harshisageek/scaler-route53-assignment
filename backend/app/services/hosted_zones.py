@@ -5,6 +5,7 @@ from app.models import HostedZone, RecordSet, User
 from app.models import HostedZoneTag as HostedZoneTagModel
 from app.repositories import hosted_zones as repository
 from app.repositories import record_sets
+from app.schemas.bulk import HostedZoneDeleteBatch, HostedZoneDeleteResult
 from app.schemas.hosted_zone import (
     HostedZoneCreate,
     HostedZoneDetail,
@@ -73,6 +74,34 @@ def delete_hosted_zone(db: Session, owner: User, zone_id: str) -> None:
         )
     repository.delete_hosted_zone(db, zone)
     db.commit()
+
+
+def delete_hosted_zones(
+    db: Session,
+    owner: User,
+    request: HostedZoneDeleteBatch,
+) -> HostedZoneDeleteResult:
+    zone_ids = list(dict.fromkeys(request.hosted_zone_ids))
+    zones = [_owned_zone(db, owner, zone_id) for zone_id in zone_ids]
+    non_empty = [
+        {"hosted_zone_id": zone.id, "record_count": extra}
+        for zone in zones
+        if (extra := record_sets.count_non_default(db, zone)) > 0
+    ]
+    if non_empty:
+        raise ConflictError(
+            "Every selected hosted zone must contain only its default NS and SOA records.",
+            {"hosted_zones": non_empty},
+            code="HostedZonesNotEmpty",
+        )
+    try:
+        for zone in zones:
+            repository.delete_hosted_zone(db, zone)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return HostedZoneDeleteResult(deleted_count=len(zones))
 
 
 def create_hosted_zone(db: Session, owner: User, request: HostedZoneCreate) -> HostedZoneDetail:

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/api/client';
 import type {
+  HostedZoneDeleteBatch,
+  HostedZoneDeleteResult,
   HostedZoneCreate,
   HostedZoneDetail,
   HostedZoneList,
@@ -82,6 +84,23 @@ export function useDeleteHostedZone(zoneId: string) {
       }),
     onSuccess: () => {
       queryClient.removeQueries({ queryKey: hostedZoneKeys.detail(zoneId) });
+      void queryClient.invalidateQueries({ queryKey: hostedZoneKeys.lists() });
+    },
+  });
+}
+
+export function useDeleteHostedZones() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: HostedZoneDeleteBatch) =>
+      apiRequest<HostedZoneDeleteResult>('/hosted-zones:batch', {
+        method: 'POST',
+        body,
+      }),
+    onSuccess: (_, body) => {
+      for (const zoneId of body.hosted_zone_ids) {
+        queryClient.removeQueries({ queryKey: hostedZoneKeys.detail(zoneId) });
+      }
       void queryClient.invalidateQueries({ queryKey: hostedZoneKeys.lists() });
     },
   });
