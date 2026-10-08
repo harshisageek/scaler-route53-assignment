@@ -1,19 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-
-const PASSWORD = 'correct horse battery staple';
-
-function uniqueEmail(): string {
-  return `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
-}
-
-async function signUp(page: Page, email: string) {
-  await page.goto('/signup');
-  await page.getByLabel('Email address').fill(email);
-  await page.getByLabel('Password', { exact: true }).fill(PASSWORD);
-  await page.getByLabel('Confirm password').fill(PASSWORD);
-  await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/route53\/hosted-zones$/);
-}
+import { expect, test } from '@playwright/test';
+import { PASSWORD, signUp, uniqueEmail } from './helpers';
 
 test('a new account starts empty and cannot see the demo zones', async ({ page }) => {
   await signUp(page, uniqueEmail());

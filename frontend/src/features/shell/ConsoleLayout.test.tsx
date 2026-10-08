@@ -30,17 +30,19 @@ afterEach(() => {
 });
 
 describe('ConsoleLayout', () => {
-  it('shows the signed-in user and their account ID', async () => {
+  it('shows the signed-in user, their account ID and the zone in the breadcrumbs', async () => {
+    const responses: Record<string, unknown> = {
+      '/api/v1/auth/me': {
+        email: 'alice@example.com',
+        account_id: '123456789012',
+        is_demo: false,
+        created_at: '2026-10-01T12:00:00Z',
+      },
+      '/api/v1/hosted-zones/Z1': { id: 'Z1', name: 'example.com.' },
+    };
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        jsonResponse(200, {
-          email: 'alice@example.com',
-          account_id: '123456789012',
-          is_demo: false,
-          created_at: '2026-10-01T12:00:00Z',
-        }),
-      ),
+      vi.fn((url: string) => Promise.resolve(jsonResponse(200, responses[url]))),
     );
 
     renderLayout();
@@ -48,6 +50,7 @@ describe('ConsoleLayout', () => {
     expect(await screen.findByText('Page content')).toBeInTheDocument();
     expect(screen.getAllByText('alice@example.com').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Account ID: 1234-5678-9012').length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('example.com')).length).toBeGreaterThan(0);
   });
 
   it('sends a signed-out visitor to sign in without showing the page', async () => {

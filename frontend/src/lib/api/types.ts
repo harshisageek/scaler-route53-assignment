@@ -9,6 +9,8 @@ import type { components } from './schema';
 type Schemas = components['schemas'];
 
 export type HostedZone = Schemas['HostedZoneOut'];
+export type HostedZoneDetail = Schemas['HostedZoneDetail'];
+export type HostedZoneCreate = Schemas['HostedZoneCreate'];
 export type HostedZoneList = Schemas['HostedZoneList'];
 
 export type User = Schemas['UserOut'];
