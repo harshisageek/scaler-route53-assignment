@@ -37,10 +37,10 @@ export function ComingSoonPage({
       <Container>
         <Box textAlign="center" padding={{ vertical: 'xxxl' }}>
           <SpaceBetween size="m">
-            <StatusIndicator type="pending">Coming soon</StatusIndicator>
+            <StatusIndicator type="info">Not implemented</StatusIndicator>
             <Box variant="p">
-              This learning clone includes the console destination now. Its full workflow
-              will be added in a later phase.
+              This destination mirrors the Route 53 console navigation. Its full AWS
+              workflow is outside the scope of this clone.
             </Box>
           </SpaceBetween>
         </Box>

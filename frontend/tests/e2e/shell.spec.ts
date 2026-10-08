@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { signUp, uniqueEmail } from './helpers';
 
-test('the console navigation, help panel and coming-soon pages work together', async ({
+test('the console navigation, help panel and unimplemented pages work together', async ({
   page,
 }) => {
   await signUp(page, uniqueEmail());
@@ -17,7 +17,8 @@ test('the console navigation, help panel and coming-soon pages work together', a
   await expect(
     page.getByRole('heading', { name: 'Traffic policies', level: 1 }),
   ).toBeVisible();
-  await expect(page.getByText('Coming soon', { exact: true })).toBeVisible();
+  await expect(page.getByText('Not implemented', { exact: true })).toBeVisible();
+  await expect(page.getByText(/outside the scope of this clone/)).toBeVisible();
   await expect(page.getByLabel('Breadcrumbs')).toContainText('Traffic policies');
 
   await page.goto('/route53/not-a-real-page');
