@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     )
 
     login_rate_limit: str = "5/minute"
+    # App-wide, not per client: they cap the cost of creating accounts.
+    sign_up_rate_limit: str = "10/minute"
+    demo_rate_limit: str = "30/minute"
     max_import_bytes: int = Field(default=1_048_576, ge=1024)
 
     seed_demo_data: bool = True
@@ -61,7 +64,7 @@ class Settings(BaseSettings):
             raise ValueError(f"log_level must be one of {sorted(allowed)}")
         return upper
 
-    @field_validator("login_rate_limit")
+    @field_validator("login_rate_limit", "sign_up_rate_limit", "demo_rate_limit")
     @classmethod
     def _valid_rate_limit(cls, value: str) -> str:
         _parse_rate(value)
@@ -81,6 +84,14 @@ class Settings(BaseSettings):
     def login_attempts_per_window(self) -> tuple[int, int]:
         """The login rate limit as (allowed failed attempts, window in seconds)."""
         return _parse_rate(self.login_rate_limit)
+
+    @property
+    def sign_ups_per_window(self) -> tuple[int, int]:
+        return _parse_rate(self.sign_up_rate_limit)
+
+    @property
+    def demo_visitors_per_window(self) -> tuple[int, int]:
+        return _parse_rate(self.demo_rate_limit)
 
 
 _RATE_UNITS = {"second": 1, "minute": 60, "hour": 3600}

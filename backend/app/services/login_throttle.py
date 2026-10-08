@@ -1,9 +1,9 @@
-"""Limits failed sign-in attempts per email address.
+"""A sliding-window limit on attempts per key.
 
-Keyed on the email rather than the client IP: behind Vercel and Render the IP
-comes from a forwarded header the client can forge, while the email is the
-thing an attacker is actually guessing passwords for. Only failures count, so
-a user who types their password correctly is never locked out.
+Sign-in keys it on the email together with the client address, so failures
+from one client cannot lock the owner out from another. The client address is
+the one uvicorn resolves, which only honours X-Forwarded-For from proxies listed
+in FORWARDED_ALLOW_IPS, so a client cannot forge it.
 
 State is kept in memory, which is correct for the single API process this app
 runs. Several processes would each keep their own count.

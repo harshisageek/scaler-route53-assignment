@@ -116,3 +116,15 @@ def test_invalid_and_oversized_files_are_rejected(alice: TestClient) -> None:
     assert invalid.json()["error"]["code"] == "InvalidBindFile"
     assert oversized.status_code == 422
     assert oversized.json()["error"]["code"] == "BindFileTooLarge"
+
+
+def test_generate_directives_are_rejected_before_expansion(alice: TestClient) -> None:
+    zone = create_zone(alice)
+    url = f"{ZONES}/{zone['id']}/records/import/preview"
+    huge_range = b"$ORIGIN example.com.\n$TTL 300\n  $generate 1-10000000 host-$ A 192.0.2.1\n"
+
+    response = upload(alice, url, huge_range)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "InvalidBindFile"
+    assert "$GENERATE" in response.json()["error"]["message"]

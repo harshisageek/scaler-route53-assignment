@@ -23,9 +23,7 @@ services:
       - key: SESSION_COOKIE_SECURE
         value: "true"
       - key: SEED_DEMO_DATA
-        value: "true"
-      - key: DEMO_USER_PASSWORD
-        sync: false
+        value: "false"
       - key: LITESTREAM_S3_ENDPOINT
         sync: false
       - key: LITESTREAM_S3_BUCKET

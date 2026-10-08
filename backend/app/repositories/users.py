@@ -40,6 +40,21 @@ def delete_session(db: Session, token_hash: str) -> None:
     db.execute(delete(UserSession).where(UserSession.token_hash == token_hash))
 
 
+def delete_abandoned_visitors(
+    db: Session, email_domain: str, now: datetime, created_before: datetime
+) -> None:
+    """Delete demo visitor accounts with no live session. Zones and records cascade."""
+    live_session = exists().where(UserSession.user_id == User.id, UserSession.expires_at > now)
+    db.execute(
+        delete(User).where(
+            User.is_demo.is_(True),
+            User.email.endswith(f"@{email_domain}"),
+            User.created_at < created_before,
+            ~live_session,
+        )
+    )
+
+
 def delete_expired_sessions(db: Session, user_id: int, now: datetime) -> None:
     db.execute(
         delete(UserSession).where(UserSession.user_id == user_id, UserSession.expires_at <= now)

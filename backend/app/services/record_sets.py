@@ -20,6 +20,18 @@ from app.services.validation.record_values import (
     normalize_record_values,
 )
 
+MAX_RECORD_SETS_PER_ZONE = 10_000
+
+
+def ensure_record_capacity(db: Session, zone: HostedZone, additions: int) -> None:
+    existing = record_sets.count_by_zone(db, [zone.id])[zone.id]
+    if existing + additions > MAX_RECORD_SETS_PER_ZONE:
+        raise ConflictError(
+            f"A hosted zone can have at most {MAX_RECORD_SETS_PER_ZONE} record sets.",
+            {"maximum_record_sets": MAX_RECORD_SETS_PER_ZONE},
+            code="TooManyRecordSets",
+        )
+
 
 def list_record_sets(
     db: Session, owner: User, zone_id: str, params: RecordSetListParams
@@ -57,6 +69,7 @@ def create_record_set(
     commit: bool = True,
 ) -> RecordSetOut:
     zone = _owned_zone(db, owner, zone_id)
+    ensure_record_capacity(db, zone, 1)
     name = _record_name(request.name, zone.name)
     values = [] if request.alias else _record_values(request.type, request.values)
     alias_target = _alias_target(db, zone, name, request)

@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from typing import Literal, cast
 
@@ -17,6 +18,7 @@ from app.schemas.bind_import import (
     BindImportResult,
 )
 from app.schemas.record_set import EditableRecordType
+from app.services.record_sets import ensure_record_capacity
 from app.services.validation.domain_names import (
     InvalidDomainNameError,
     normalize_record_name,
@@ -25,6 +27,9 @@ from app.services.validation.record_values import (
     InvalidRecordValueError,
     normalize_record_values,
 )
+
+# dnspython expands $GENERATE in full before any record limit can apply.
+_GENERATE_DIRECTIVE = re.compile(r"^\s*\$GENERATE\b", re.IGNORECASE | re.MULTILINE)
 
 MAX_BIND_FILE_SIZE = 1024 * 1024
 MAX_IMPORT_RECORD_SETS = 1000
@@ -82,6 +87,7 @@ def apply_bind_import(
         )
         for candidate in candidates
     ]
+    ensure_record_capacity(db, zone, len(additions))
     try:
         record_sets.add_record_sets(db, additions)
         db.commit()
@@ -170,6 +176,11 @@ def _parse(content: bytes, origin: str) -> list[_ParsedRecord]:
     if not text.strip():
         raise ValidationFailedError(
             "The BIND file is empty.",
+            code="InvalidBindFile",
+        )
+    if _GENERATE_DIRECTIVE.search(text):
+        raise ValidationFailedError(
+            "$GENERATE directives are not supported. List each record explicitly.",
             code="InvalidBindFile",
         )
 

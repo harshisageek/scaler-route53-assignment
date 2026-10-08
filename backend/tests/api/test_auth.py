@@ -138,6 +138,38 @@ def test_repeated_failures_are_throttled_even_with_the_right_password(
     assert response.json()["error"]["details"]["retry_after_seconds"] > 0
 
 
+def test_failures_from_one_client_do_not_lock_the_owner_out_elsewhere(
+    settings: Settings, db_session: Session
+) -> None:
+    app = _app_with(settings, db_session, login_rate_limit="2/minute")
+    with (
+        TestClient(app, client=("203.0.113.66", 50000)) as attacker,
+        TestClient(app, client=("198.51.100.7", 50000)) as owner,
+    ):
+        sign_up(owner, "alice@example.com")
+        owner.cookies.clear()
+        for _ in range(3):
+            sign_in(attacker, "alice@example.com", "a guess")
+
+        assert sign_in(attacker, "alice@example.com") == 429
+        assert sign_in(owner, "alice@example.com") == 200
+
+
+def test_sign_up_is_rate_limited_across_the_whole_app(
+    settings: Settings, db_session: Session
+) -> None:
+    app = _app_with(settings, db_session, sign_up_rate_limit="2/minute")
+    with TestClient(app) as client:
+        sign_up(client, "one@example.com")
+        sign_up(client, "two@example.com")
+        response = client.post(
+            "/api/v1/auth/sign-up", json={"email": "three@example.com", "password": PASSWORD}
+        )
+
+    assert response.status_code == 429
+    assert response.json()["error"]["details"]["retry_after_seconds"] > 0
+
+
 # --- Sessions ----------------------------------------------------------------
 
 
