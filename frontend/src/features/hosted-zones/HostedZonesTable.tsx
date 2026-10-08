@@ -12,13 +12,26 @@ import TextFilter from '@cloudscape-design/components/text-filter';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ROUTES } from '@/features/shell/navigation';
+import { useHelpPanel } from '@/features/shell/help';
+import {
+  type PreferenceColumn,
+  useTablePreferences,
+} from '@/features/shell/TablePreferences';
 import type { HostedZone, HostedZoneSort } from '@/lib/api/types';
 import { useHostedZones } from './api';
 import { displayZoneName, displayZoneType } from './format';
 import { DeleteHostedZoneModal, EditHostedZoneModal } from './HostedZoneModals';
 
 type Navigate = (href: string) => void;
-const PAGE_SIZE = 10;
+
+const PREFERENCE_COLUMNS: PreferenceColumn[] = [
+  { id: 'name', label: 'Hosted zone name', alwaysVisible: true },
+  { id: 'type', label: 'Type' },
+  { id: 'createdBy', label: 'Created by' },
+  { id: 'recordCount', label: 'Record count' },
+  { id: 'description', label: 'Description' },
+  { id: 'id', label: 'Hosted zone ID' },
+];
 
 const columns = (navigate: Navigate): TableProps.ColumnDefinition<HostedZone>[] => [
   {
@@ -93,6 +106,12 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 
 export function HostedZonesTable() {
   const router = useRouter();
+  const openHelp = useHelpPanel();
+  const { preferences, control: preferencesControl } = useTablePreferences(
+    'hosted-zones',
+    PREFERENCE_COLUMNS,
+  );
+  const pageSize = preferences.pageSize ?? 10;
   const [filteringText, setFilteringText] = useState('');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<HostedZoneSort>('name');
@@ -101,16 +120,21 @@ export function HostedZonesTable() {
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const params = useMemo(
-    () => ({ q: query || undefined, sort, page, page_size: PAGE_SIZE }),
-    [page, query, sort],
+    () => ({ q: query || undefined, sort, page, page_size: pageSize }),
+    [page, pageSize, query, sort],
   );
   const { data, isPending, error, refetch } = useHostedZones(params);
   const columnDefinitions = useMemo(() => columns(router.push), [router]);
+  const visibleColumns =
+    preferences.visibleContent ?? PREFERENCE_COLUMNS.map(({ id }) => id);
+  const displayedColumns = columnDefinitions.filter(
+    (column) => column.id && visibleColumns.includes(column.id),
+  );
   const sortField = sort.startsWith('-') ? sort.slice(1) : sort;
   const sortingColumn = columnDefinitions.find(
     (column) => column.sortingField === sortField,
   );
-  const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
+  const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -134,10 +158,15 @@ export function HostedZonesTable() {
         selectionType="single"
         selectedItems={selected ? [selected] : []}
         onSelectionChange={({ detail }) => setSelected(detail.selectedItems[0])}
-        columnDefinitions={columnDefinitions}
+        columnDefinitions={displayedColumns}
         items={data?.items ?? []}
         loading={isPending}
         loadingText="Loading hosted zones"
+        skeleton={{ totalRows: pageSize }}
+        wrapLines={preferences.wrapLines}
+        stripedRows={preferences.stripedRows}
+        contentDensity={preferences.contentDensity}
+        preferences={preferencesControl}
         sortingColumn={sortingColumn}
         sortingDescending={sort.startsWith('-')}
         onSortingChange={({ detail }) => {
@@ -175,6 +204,11 @@ export function HostedZonesTable() {
           <Header
             variant="awsui-h1-sticky"
             counter={data ? `(${data.total})` : undefined}
+            info={
+              <Link variant="info" onFollow={openHelp}>
+                Info
+              </Link>
+            }
             actions={
               <SpaceBetween direction="horizontal" size="xs">
                 <Button

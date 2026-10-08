@@ -6,12 +6,14 @@ import ContentLayout from '@cloudscape-design/components/content-layout';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import Header from '@cloudscape-design/components/header';
 import KeyValuePairs from '@cloudscape-design/components/key-value-pairs';
+import Link from '@cloudscape-design/components/link';
+import Skeleton from '@cloudscape-design/components/skeleton';
 import SpaceBetween from '@cloudscape-design/components/space-between';
-import Spinner from '@cloudscape-design/components/spinner';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { RecordSetsTable } from '@/features/records/RecordSetsTable';
+import { useHelpPanel } from '@/features/shell/help';
 import { ROUTES } from '@/features/shell/navigation';
 import { ApiError } from '@/lib/api/errors';
 import type { HostedZoneDetail } from '@/lib/api/types';
@@ -22,6 +24,7 @@ import { AWS_REGIONS } from './regions';
 
 export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
   const router = useRouter();
+  const openHelp = useHelpPanel();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { data: zone, error, isPending, refetch } = useHostedZone(zoneId);
@@ -29,7 +32,11 @@ export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
   if (isPending) {
     return (
       <Box textAlign="center" padding="xxl">
-        <Spinner size="large" />
+        <SpaceBetween size="s">
+          <Skeleton variant="text-heading-xl" />
+          <Skeleton variant="text-body-m" />
+          <Skeleton variant="text-body-m" />
+        </SpaceBetween>
       </Box>
     );
   }
@@ -61,6 +68,11 @@ export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
           <Header
             variant="h1"
             description={zone.comment ?? undefined}
+            info={
+              <Link variant="info" onFollow={openHelp}>
+                Info
+              </Link>
+            }
             actions={
               <SpaceBetween direction="horizontal" size="xs">
                 <Button onClick={() => setEditing(true)}>Edit</Button>
