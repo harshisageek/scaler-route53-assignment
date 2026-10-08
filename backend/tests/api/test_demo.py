@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-SAMPLE_NAMES = sorted(zone["name"] for zone in SAMPLE_ZONES)
+SAMPLE_NAMES = sorted(zone.name for zone in SAMPLE_ZONES)
 
 
 def zone_names(client: TestClient) -> list[str]:

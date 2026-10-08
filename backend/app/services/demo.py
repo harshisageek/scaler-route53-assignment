@@ -6,29 +6,28 @@ back to the sample set. Checking at sign-in needs no scheduler or extra secret.
 """
 
 from datetime import timedelta
-from typing import TypedDict
 
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.core.security import hash_password, verify_password
 from app.db.base import utcnow
-from app.models import HostedZone, User
+from app.models import User
 from app.repositories import hosted_zones as zones
 from app.repositories import users
-from app.services.ids import new_account_id, new_hosted_zone_id
+from app.schemas.hosted_zone import HostedZoneCreate, Vpc
+from app.services.hosted_zones import add_hosted_zone
+from app.services.ids import new_account_id
 
-
-class SampleZone(TypedDict):
-    name: str
-    comment: str
-    private_zone: bool
-
-
-SAMPLE_ZONES: list[SampleZone] = [
-    {"name": "example.com.", "comment": "Sample public hosted zone", "private_zone": False},
-    {"name": "shop.example.net.", "comment": "Storefront", "private_zone": False},
-    {"name": "internal.example.com.", "comment": "Private VPC zone", "private_zone": True},
+SAMPLE_ZONES: list[HostedZoneCreate] = [
+    HostedZoneCreate(name="example.com", comment="Sample public hosted zone"),
+    HostedZoneCreate(name="shop.example.net", comment="Storefront"),
+    HostedZoneCreate(
+        name="internal.example.com",
+        comment="Private VPC zone",
+        private_zone=True,
+        vpc=Vpc(region="us-east-1", vpc_id="vpc-0a1b2c3d"),
+    ),
 ]
 
 
@@ -62,6 +61,6 @@ def reset_if_stale(db: Session, settings: Settings, user: User) -> bool:
 
     zones.delete_all_hosted_zones(db, user.id)
     for zone in SAMPLE_ZONES:
-        zones.add_hosted_zone(db, HostedZone(id=new_hosted_zone_id(), owner_id=user.id, **zone))
+        add_hosted_zone(db, user.id, zone)
     user.demo_data_reset_at = now
     return True
