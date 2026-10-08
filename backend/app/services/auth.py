@@ -26,6 +26,8 @@ from app.services import demo
 from app.services.ids import new_account_id
 from app.services.login_throttle import LoginThrottle
 
+SIGN_UP_THROTTLE_KEY = "sign-up"
+
 
 @dataclass(frozen=True)
 class ActiveSession:
@@ -34,7 +36,14 @@ class ActiveSession:
     renewed: bool
 
 
-def sign_up(db: Session, email: str, password: str) -> User:
+def sign_up(db: Session, throttle: LoginThrottle, email: str, password: str) -> User:
+    """Create an account. The limit is app-wide because password hashing is the costly part."""
+    if retry_after := throttle.retry_after(SIGN_UP_THROTTLE_KEY):
+        raise TooManyRequestsError(
+            "Too many accounts are being created. Try again shortly.",
+            {"retry_after_seconds": retry_after},
+        )
+    throttle.record_failure(SIGN_UP_THROTTLE_KEY)
     if repository.get_user_by_email(db, email) is not None:
         raise ConflictError(
             "An account with this email already exists.", code="EmailAlreadyRegistered"
@@ -48,9 +57,15 @@ def sign_up(db: Session, email: str, password: str) -> User:
 
 
 def sign_in(
-    db: Session, settings: Settings, throttle: LoginThrottle, email: str, password: str
+    db: Session,
+    settings: Settings,
+    throttle: LoginThrottle,
+    email: str,
+    password: str,
+    client_address: str,
 ) -> User:
-    if retry_after := throttle.retry_after(email):
+    throttle_key = f"{email}|{client_address}"
+    if retry_after := throttle.retry_after(throttle_key):
         raise TooManyRequestsError(
             "Too many failed sign-in attempts. Try again shortly.",
             {"retry_after_seconds": retry_after},
@@ -58,10 +73,10 @@ def sign_in(
 
     user = repository.get_user_by_email(db, email)
     if not verify_password(user.password_hash if user else None, password) or user is None:
-        throttle.record_failure(email)
+        throttle.record_failure(throttle_key)
         raise UnauthorizedError("Incorrect email or password.", code="InvalidCredentials")
 
-    throttle.reset(email)
+    throttle.reset(throttle_key)
     if password_needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
     if user.is_demo:

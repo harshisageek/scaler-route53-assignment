@@ -55,6 +55,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.login_throttle = LoginThrottle(*settings.login_attempts_per_window)
+    app.state.sign_up_throttle = LoginThrottle(*settings.sign_ups_per_window)
+    app.state.demo_throttle = LoginThrottle(*settings.demo_visitors_per_window)
 
     # Local development only: in production Next.js proxies /api/* so the
     # browser never makes a cross-origin request.

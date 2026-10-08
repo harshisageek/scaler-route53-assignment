@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.api.deps import (
     clear_session_cookie,
     get_current_user,
+    get_demo_throttle,
     get_login_throttle,
+    get_sign_up_throttle,
     set_session_cookie,
 )
 from app.core.config import Settings, get_settings
@@ -28,8 +30,9 @@ def sign_up(
     response: Response,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    throttle: LoginThrottle = Depends(get_sign_up_throttle),
 ) -> User:
-    user = auth.sign_up(db, body.email, body.password)
+    user = auth.sign_up(db, throttle, body.email, body.password)
     set_session_cookie(response, settings, auth.create_session(db, settings, user))
     return user
 
@@ -37,23 +40,26 @@ def sign_up(
 @router.post("/sign-in", response_model=UserOut, summary="Sign in with email and password")
 def sign_in(
     body: SignInRequest,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
     throttle: LoginThrottle = Depends(get_login_throttle),
 ) -> User:
-    user = auth.sign_in(db, settings, throttle, body.email, body.password)
+    client_address = request.client.host if request.client else "unknown"
+    user = auth.sign_in(db, settings, throttle, body.email, body.password, client_address)
     set_session_cookie(response, settings, auth.create_session(db, settings, user))
     return user
 
 
-@router.post("/demo", response_model=UserOut, summary="Sign in to the shared demo account")
+@router.post("/demo", response_model=UserOut, summary="Sign in to a private demo account")
 def sign_in_demo(
     response: Response,
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    throttle: LoginThrottle = Depends(get_demo_throttle),
 ) -> User:
-    user = demo.ensure_demo_account(db, settings)
+    user = demo.create_visitor_account(db, throttle)
     set_session_cookie(response, settings, auth.create_session(db, settings, user))
     return user
 

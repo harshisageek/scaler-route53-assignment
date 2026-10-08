@@ -64,7 +64,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sign in to the shared demo account */
+        /** Sign in to a private demo account */
         post: operations["sign_in_demo_api_v1_auth_demo_post"];
         delete?: never;
         options?: never;

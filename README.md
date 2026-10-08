@@ -25,14 +25,23 @@ not operate authoritative DNS servers or change real AWS resources.
 
 ## Demo account
 
-Docker Compose reads the safe local values in `backend/.env.example`:
+Choose **Try the demo** on the sign-in screen; no password entry is required.
+Each click creates a private visitor account with a fresh copy of the sample
+zones, so visitors never see each other's edits. Visitor accounts have no
+usable password and are deleted once they have no live session.
 
-- Email: `demo@route53-clone.dev`
-- Password: `change-me-locally`
+For local development, Docker Compose also seeds a shared account from the safe
+values in `backend/.env.example` (`demo@route53-clone.dev` /
+`change-me-locally`). Its data is restored at sign-in when older than 24 hours.
+Production turns this off with `SEED_DEMO_DATA=false`.
 
-Choose **Try the demo** on the sign-in screen; no password entry is
-required. Demo data is restored when it is older than 24 hours at the next demo
-sign-in. A hosted deployment must set its own `DEMO_USER_PASSWORD`.
+## Abuse limits
+
+- Failed sign-ins: `LOGIN_RATE_LIMIT` per email and client address, so failures
+  from one client cannot lock the owner out from another.
+- Account creation: `SIGN_UP_RATE_LIMIT` and `DEMO_RATE_LIMIT`, app-wide.
+- Quotas: 100 hosted zones per account and 10,000 record sets per zone.
+- BIND import rejects `$GENERATE`, which would expand before any record limit.
 
 ## Architecture
 
@@ -153,12 +162,14 @@ Real `.env` files are ignored. Commit only the documented example files.
 | `SESSION_TTL_HOURS` | `12` | Session lifetime |
 | `SESSION_COOKIE_SECURE` | `false` | Must be `true` in production |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | Direct-backend local development only |
-| `LOGIN_RATE_LIMIT` | `5/minute` | Failed sign-in throttle |
+| `LOGIN_RATE_LIMIT` | `5/minute` | Failed sign-ins per email and client |
+| `SIGN_UP_RATE_LIMIT` | `10/minute` | App-wide account sign-ups |
+| `DEMO_RATE_LIMIT` | `30/minute` | App-wide demo visitor accounts |
 | `MAX_IMPORT_BYTES` | `1048576` | BIND upload limit |
-| `SEED_DEMO_DATA` | `true` | Create/reset the shared demo account |
+| `SEED_DEMO_DATA` | `true` | Create the shared local demo account |
 | `DEMO_USER_EMAIL` | `demo@route53-clone.dev` | Demo account email |
-| `DEMO_USER_PASSWORD` | local placeholder | Set privately for hosted environments |
-| `DEMO_RESET_INTERVAL_HOURS` | `24` | Demo reset age |
+| `DEMO_USER_PASSWORD` | local placeholder | Shared local account password |
+| `DEMO_RESET_INTERVAL_HOURS` | `24` | Shared account reset age |
 | `LITESTREAM_S3_ENDPOINT` | empty locally | Supabase S3 endpoint |
 | `LITESTREAM_S3_BUCKET` | empty locally | Backup bucket |
 | `LITESTREAM_S3_REGION` | empty locally | Bucket region |
@@ -251,8 +262,7 @@ currently attached to it.
 1. Import `frontend/` into Vercel and set `BACKEND_URL` to the Render service.
 2. Create the Render Blueprint from `render.yaml`.
 3. Create a private Supabase Storage bucket with S3 access.
-4. Enter the five `LITESTREAM_*` values and a private
-   `DEMO_USER_PASSWORD` in Render.
+4. Enter the five `LITESTREAM_*` values in Render.
 5. Set the GitHub Actions variable `HEALTHCHECK_URL` to the Render
    `/api/v1/health` URL.
 
@@ -270,7 +280,7 @@ replicates writes. The keep-awake workflow pings health every ten minutes.
 - Records are stored and managed but are not served by an authoritative DNS server.
 - Alias targets and routing policies are modeled, not resolved against AWS or used for traffic routing.
 - The deployment configuration requires the owner to supply Vercel, Render, and Supabase accounts.
-- The shared demo resets lazily on sign-in rather than on a scheduler.
+- Abandoned demo visitor accounts are removed when the next visitor arrives, not on a scheduler.
 - SQLite is appropriate for this assignment and modest single-instance traffic, not a horizontally scaled writer fleet.
 
 ## Project layout

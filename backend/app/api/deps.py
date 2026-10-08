@@ -38,6 +38,16 @@ def get_login_throttle(request: Request) -> LoginThrottle:
     return throttle
 
 
+def get_sign_up_throttle(request: Request) -> LoginThrottle:
+    throttle: LoginThrottle = request.app.state.sign_up_throttle
+    return throttle
+
+
+def get_demo_throttle(request: Request) -> LoginThrottle:
+    throttle: LoginThrottle = request.app.state.demo_throttle
+    return throttle
+
+
 def get_current_user(
     request: Request,
     response: Response,

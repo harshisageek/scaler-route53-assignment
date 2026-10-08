@@ -21,6 +21,8 @@ from app.schemas.hosted_zone import (
 from app.services import name_servers
 from app.services.ids import new_hosted_zone_id
 
+MAX_HOSTED_ZONES_PER_ACCOUNT = 100
+
 
 def list_hosted_zones(db: Session, owner: User, params: HostedZoneListParams) -> HostedZoneList:
     rows, total = repository.search_hosted_zones(
@@ -105,6 +107,12 @@ def delete_hosted_zones(
 
 
 def create_hosted_zone(db: Session, owner: User, request: HostedZoneCreate) -> HostedZoneDetail:
+    if repository.count_hosted_zones(db, owner.id) >= MAX_HOSTED_ZONES_PER_ACCOUNT:
+        raise ConflictError(
+            f"An account can have at most {MAX_HOSTED_ZONES_PER_ACCOUNT} hosted zones.",
+            {"maximum_hosted_zones": MAX_HOSTED_ZONES_PER_ACCOUNT},
+            code="TooManyHostedZones",
+        )
     zone = add_hosted_zone(db, owner.id, request)
     db.commit()
     return _detail(db, zone)

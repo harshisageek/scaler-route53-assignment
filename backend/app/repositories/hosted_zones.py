@@ -84,6 +84,11 @@ def get_hosted_zone(db: Session, owner_id: int, zone_id: str) -> HostedZone | No
     return db.scalar(statement)
 
 
+def count_hosted_zones(db: Session, owner_id: int) -> int:
+    statement = select(func.count()).select_from(HostedZone).where(HostedZone.owner_id == owner_id)
+    return db.scalar(statement) or 0
+
+
 def add_hosted_zone(db: Session, zone: HostedZone) -> HostedZone:
     db.add(zone)
     db.flush()

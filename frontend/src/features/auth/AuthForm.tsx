@@ -183,7 +183,7 @@ export function AuthForm({ mode, next }: { mode: AuthMode; next?: string }) {
             )}
             {mode === 'signin' && (
               <Alert type="info">
-                The demo account is shared and its sample data resets daily.
+                The demo opens a private copy of the sample data, just for you.
               </Alert>
             )}
             <Box>
