@@ -87,6 +87,7 @@ describe('CreateHostedZoneForm', () => {
       comment: 'Production',
       private_zone: false,
       vpc: null,
+      tags: [],
     });
     navigated();
     expect(

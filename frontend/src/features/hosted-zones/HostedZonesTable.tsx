@@ -5,12 +5,14 @@ import Button from '@cloudscape-design/components/button';
 import Header from '@cloudscape-design/components/header';
 import Link from '@cloudscape-design/components/link';
 import Pagination from '@cloudscape-design/components/pagination';
+import PropertyFilter, {
+  type PropertyFilterProps,
+} from '@cloudscape-design/components/property-filter';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Table, { type TableProps } from '@cloudscape-design/components/table';
-import TextFilter from '@cloudscape-design/components/text-filter';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ROUTES } from '@/features/shell/navigation';
 import { useHelpPanel } from '@/features/shell/help';
 import {
@@ -23,6 +25,7 @@ import { displayZoneName, displayZoneType } from './format';
 import { DeleteHostedZoneModal, EditHostedZoneModal } from './HostedZoneModals';
 
 type Navigate = (href: string) => void;
+const EMPTY_QUERY: PropertyFilterProps.Query = { operation: 'and', tokens: [] };
 
 const PREFERENCE_COLUMNS: PreferenceColumn[] = [
   { id: 'name', label: 'Hosted zone name', alwaysVisible: true },
@@ -30,6 +33,7 @@ const PREFERENCE_COLUMNS: PreferenceColumn[] = [
   { id: 'createdBy', label: 'Created by' },
   { id: 'recordCount', label: 'Record count' },
   { id: 'description', label: 'Description' },
+  { id: 'tags', label: 'Tags' },
   { id: 'id', label: 'Hosted zone ID' },
 ];
 
@@ -65,8 +69,56 @@ const columns = (navigate: Navigate): TableProps.ColumnDefinition<HostedZone>[] 
     cell: (zone) => zone.record_count,
   },
   { id: 'description', header: 'Description', cell: (zone) => zone.comment || '-' },
+  {
+    id: 'tags',
+    header: 'Tags',
+    cell: (zone) =>
+      (zone.tags?.length ?? 0) > 0
+        ? zone.tags?.map((tag) => `${tag.key}=${tag.value}`).join(', ')
+        : '-',
+  },
   { id: 'id', header: 'Hosted zone ID', cell: (zone) => zone.id },
 ];
+
+const FILTER_PROPERTIES: PropertyFilterProps.FilteringProperty[] = [
+  {
+    key: 'tagKey',
+    propertyLabel: 'Tag key',
+    groupValuesLabel: 'Tag keys',
+    operators: ['='],
+  },
+  {
+    key: 'tagValue',
+    propertyLabel: 'Tag value',
+    groupValuesLabel: 'Tag values',
+    operators: ['='],
+  },
+];
+
+const FILTER_I18N: PropertyFilterProps.I18nStrings = {
+  filteringAriaLabel: 'Find hosted zones',
+  dismissAriaLabel: 'Dismiss',
+  filteringPlaceholder: 'Find hosted zones or filter by tag',
+  groupValuesText: 'Values',
+  groupPropertiesText: 'Properties',
+  operatorsText: 'Operators',
+  operationAndText: 'and',
+  operationOrText: 'or',
+  operatorEqualsText: 'equals',
+  operatorContainsText: 'contains',
+  editTokenHeader: 'Edit filter',
+  propertyText: 'Property',
+  operatorText: 'Operator',
+  valueText: 'Value',
+  cancelActionText: 'Cancel',
+  applyActionText: 'Apply',
+  allPropertiesLabel: 'All properties',
+  tokenLimitShowMore: 'Show more',
+  tokenLimitShowFewer: 'Show fewer',
+  clearFiltersText: 'Clear filters',
+  removeTokenButtonAriaLabel: (token) => `Remove ${token.propertyKey ?? 'text'} filter`,
+  enteredTextLabel: (text) => `Use: ${text}`,
+};
 
 function EmptyState() {
   return (
@@ -112,17 +164,27 @@ export function HostedZonesTable() {
     PREFERENCE_COLUMNS,
   );
   const pageSize = preferences.pageSize ?? 10;
-  const [filteringText, setFilteringText] = useState('');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState<PropertyFilterProps.Query>(EMPTY_QUERY);
   const [sort, setSort] = useState<HostedZoneSort>('name');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<HostedZone>();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const params = useMemo(
-    () => ({ q: query || undefined, sort, page, page_size: pageSize }),
-    [page, pageSize, query, sort],
-  );
+  const params = useMemo(() => {
+    const freeText = query.tokens.find((token) => token.propertyKey === undefined)?.value;
+    const tagKey = query.tokens.find((token) => token.propertyKey === 'tagKey')?.value;
+    const tagValue = query.tokens.find(
+      (token) => token.propertyKey === 'tagValue',
+    )?.value;
+    return {
+      q: typeof freeText === 'string' ? freeText : undefined,
+      tag_key: typeof tagKey === 'string' ? tagKey : undefined,
+      tag_value: typeof tagValue === 'string' ? tagValue : undefined,
+      sort,
+      page,
+      page_size: pageSize,
+    };
+  }, [page, pageSize, query.tokens, sort]);
   const { data, isPending, error, refetch } = useHostedZones(params);
   const columnDefinitions = useMemo(() => columns(router.push), [router]);
   const visibleColumns =
@@ -135,18 +197,10 @@ export function HostedZonesTable() {
     (column) => column.sortingField === sortField,
   );
   const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setQuery(filteringText.trim());
-      setPage(1);
-    }, 250);
-    return () => window.clearTimeout(timeout);
-  }, [filteringText]);
+  const hasFilters = query.tokens.length > 0;
 
   const clearFilter = () => {
-    setFilteringText('');
-    setQuery('');
+    setQuery(EMPTY_QUERY);
     setPage(1);
   };
 
@@ -176,12 +230,16 @@ export function HostedZonesTable() {
           setPage(1);
         }}
         filter={
-          <TextFilter
-            filteringText={filteringText}
-            filteringPlaceholder="Find hosted zones"
-            filteringAriaLabel="Find hosted zones"
+          <PropertyFilter
+            query={query}
+            i18nStrings={FILTER_I18N}
+            filteringProperties={FILTER_PROPERTIES}
+            filteringOptions={[]}
             countText={data ? `${data.total} match${data.total === 1 ? '' : 'es'}` : ''}
-            onChange={({ detail }) => setFilteringText(detail.filteringText)}
+            onChange={({ detail }) => {
+              setQuery(detail);
+              setPage(1);
+            }}
           />
         }
         pagination={
@@ -194,7 +252,7 @@ export function HostedZonesTable() {
         empty={
           error ? (
             <ErrorState message={error.message} onRetry={() => void refetch()} />
-          ) : query ? (
+          ) : hasFilters ? (
             <NoMatches clear={clearFilter} />
           ) : (
             <EmptyState />

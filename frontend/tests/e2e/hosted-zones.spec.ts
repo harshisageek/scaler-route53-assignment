@@ -103,11 +103,13 @@ test('the hosted zones list searches and sorts on the server', async ({ page }) 
   }
   await page.goto('/route53/hosted-zones');
 
-  await page.getByRole('searchbox', { name: 'Find hosted zones' }).fill('beta');
+  const filter = page.getByRole('combobox', { name: 'Find hosted zones' });
+  await filter.fill('beta');
+  await filter.press('Enter');
   await expect(page.getByRole('rowheader', { name: 'beta.example.com' })).toBeVisible();
   await expect(page.getByRole('rowheader', { name: 'alpha.example.com' })).toHaveCount(0);
 
-  await page.getByRole('searchbox', { name: 'Find hosted zones' }).fill('');
+  await page.getByRole('button', { name: /Remove text filter/ }).click();
   await page.getByRole('button', { name: 'Hosted zone name' }).click();
   await expect(page.getByRole('rowheader')).toHaveText([
     'gamma.example.com',

@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pydantic_core import PydanticCustomError
 
 from app.models.hosted_zone import COMMENT_MAX_LENGTH
+from app.models.hosted_zone_tag import TAG_KEY_MAX_LENGTH, TAG_VALUE_MAX_LENGTH
 from app.services.aws_regions import AWS_REGIONS
 from app.services.validation.domain_names import InvalidDomainNameError, normalize_zone_name
 
@@ -21,6 +22,36 @@ class Vpc(BaseModel):
         if value not in AWS_REGIONS:
             raise PydanticCustomError("unknown_region", "Choose an AWS Region from the list.")
         return value
+
+
+class HostedZoneTag(BaseModel):
+    key: str = Field(min_length=1, max_length=TAG_KEY_MAX_LENGTH)
+    value: str = Field(default="", max_length=TAG_VALUE_MAX_LENGTH)
+
+    @field_validator("key")
+    @classmethod
+    def _valid_key(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise PydanticCustomError("empty_tag_key", "Enter a tag key.")
+        if value.lower().startswith("aws:"):
+            raise PydanticCustomError(
+                "reserved_tag_key",
+                "Tag keys cannot start with the reserved aws: prefix.",
+            )
+        return value
+
+    @field_validator("value")
+    @classmethod
+    def _trim_value(cls, value: str) -> str:
+        return value.strip()
+
+
+def _unique_tags(tags: list[HostedZoneTag]) -> list[HostedZoneTag]:
+    keys = [tag.key for tag in tags]
+    if len(keys) != len(set(keys)):
+        raise PydanticCustomError("duplicate_tag_key", "Each tag key must be unique.")
+    return tags
 
 
 class HostedZoneCreate(BaseModel):
@@ -44,6 +75,7 @@ class HostedZoneCreate(BaseModel):
     comment: str | None = Field(default=None, max_length=COMMENT_MAX_LENGTH)
     private_zone: bool = False
     vpc: Vpc | None = Field(default=None, description="Required for private zones only.")
+    tags: list[HostedZoneTag] = Field(default_factory=list, max_length=50)
 
     @field_validator("name")
     @classmethod
@@ -66,6 +98,7 @@ class HostedZoneCreate(BaseModel):
             raise PydanticCustomError("vpc_required", "A private hosted zone needs a VPC.")
         if not self.private_zone and self.vpc is not None:
             raise PydanticCustomError("vpc_not_allowed", "Only private hosted zones have a VPC.")
+        _unique_tags(self.tags)
         return self
 
 
@@ -90,6 +123,7 @@ class HostedZoneOut(BaseModel):
     comment: str | None
     private_zone: bool
     record_count: int = Field(description="Record sets in the zone, including NS and SOA.")
+    tags: list[HostedZoneTag] = Field(default_factory=list)
     created_at: datetime
 
 
@@ -126,6 +160,7 @@ class HostedZoneUpdate(BaseModel):
     """Route 53 only lets a zone's comment change after it is created."""
 
     comment: str | None = Field(max_length=COMMENT_MAX_LENGTH)
+    tags: list[HostedZoneTag] | None = Field(default=None, max_length=50)
 
     @field_validator("comment")
     @classmethod
@@ -133,6 +168,11 @@ class HostedZoneUpdate(BaseModel):
         if value is None:
             return None
         return value.strip() or None
+
+    @field_validator("tags")
+    @classmethod
+    def _tags_are_unique(cls, value: list[HostedZoneTag] | None) -> list[HostedZoneTag] | None:
+        return _unique_tags(value) if value is not None else None
 
 
 HostedZoneSort = Literal[
@@ -148,6 +188,8 @@ class HostedZoneListParams(BaseModel):
         max_length=255,
         description="Case-insensitive text to find in the name, ID or comment.",
     )
+    tag_key: str | None = Field(default=None, min_length=1, max_length=TAG_KEY_MAX_LENGTH)
+    tag_value: str | None = Field(default=None, max_length=TAG_VALUE_MAX_LENGTH)
     sort: HostedZoneSort = Field(default="name", description="Prefix with - for descending.")
     page: int = Field(default=1, ge=1)
     # Route 53's ListHostedZones also returns up to 100 by default.

@@ -23,6 +23,8 @@ export function useHostedZones(params: HostedZoneListParams = {}) {
       apiRequest<HostedZoneList>('/hosted-zones', {
         searchParams: {
           q: params.q ?? undefined,
+          tag_key: params.tag_key ?? undefined,
+          tag_value: params.tag_value ?? undefined,
           sort: params.sort,
           page: params.page,
           page_size: params.page_size,

@@ -68,7 +68,7 @@ describe('hosted zone management modals', () => {
       '/api/v1/hosted-zones/Z0812345ABCDEFGHIJKLM',
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ comment: 'New description' }),
+        body: JSON.stringify({ comment: 'New description', tags: [] }),
       }),
     );
   });

@@ -10,6 +10,7 @@ type Schemas = components['schemas'];
 
 export type HostedZone = Schemas['HostedZoneOut'];
 export type HostedZoneDetail = Schemas['HostedZoneDetail'];
+export type HostedZoneTag = Schemas['HostedZoneTag'];
 export type HostedZoneCreate = Schemas['HostedZoneCreate'];
 export type HostedZoneUpdate = Schemas['HostedZoneUpdate'];
 export type HostedZoneListParams = NonNullable<

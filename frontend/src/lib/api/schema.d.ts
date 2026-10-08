@@ -229,6 +229,8 @@ export interface components {
             private_zone: boolean;
             /** @description Required for private zones only. */
             vpc?: components["schemas"]["Vpc"] | null;
+            /** Tags */
+            tags?: components["schemas"]["HostedZoneTag"][];
         };
         /**
          * HostedZoneDetail
@@ -268,6 +270,8 @@ export interface components {
              * @description Record sets in the zone, including NS and SOA.
              */
             record_count: number;
+            /** Tags */
+            tags?: components["schemas"]["HostedZoneTag"][];
             /**
              * Created At
              * Format: date-time
@@ -330,11 +334,23 @@ export interface components {
              * @description Record sets in the zone, including NS and SOA.
              */
             record_count: number;
+            /** Tags */
+            tags?: components["schemas"]["HostedZoneTag"][];
             /**
              * Created At
              * Format: date-time
              */
             created_at: string;
+        };
+        /** HostedZoneTag */
+        HostedZoneTag: {
+            /** Key */
+            key: string;
+            /**
+             * Value
+             * @default
+             */
+            value: string;
         };
         /**
          * HostedZoneUpdate
@@ -343,6 +359,8 @@ export interface components {
         HostedZoneUpdate: {
             /** Comment */
             comment: string | null;
+            /** Tags */
+            tags?: components["schemas"]["HostedZoneTag"][] | null;
         };
         /** RecordSetCreate */
         RecordSetCreate: {
@@ -654,6 +672,8 @@ export interface operations {
             query?: {
                 /** @description Case-insensitive text to find in the name, ID or comment. */
                 q?: string | null;
+                tag_key?: string | null;
+                tag_value?: string | null;
                 /** @description Prefix with - for descending. */
                 sort?: "name" | "-name" | "type" | "-type" | "record_count" | "-record_count" | "created_at" | "-created_at";
                 page?: number;

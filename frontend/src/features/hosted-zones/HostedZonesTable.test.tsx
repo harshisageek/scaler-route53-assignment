@@ -75,14 +75,35 @@ describe('HostedZonesTable', () => {
     await screen.findByText('example.com');
 
     await userEvent.type(
-      screen.getByRole('searchbox', { name: 'Find hosted zones' }),
+      screen.getByRole('combobox', { name: 'Find hosted zones' }),
       'missing',
     );
+    await userEvent.click(screen.getByText('Use: missing'));
 
     expect(await screen.findByText('No matches')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/v1/hosted-zones?q=missing&sort=name&page=1&page_size=10',
       expect.anything(),
+    );
+  });
+
+  it('filters on the server by tag key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, ONE_ZONE));
+    vi.stubGlobal('fetch', fetchMock);
+    renderTable();
+    await screen.findByText('example.com');
+
+    const filter = screen.getByRole('combobox', { name: 'Find hosted zones' });
+    await userEvent.click(filter);
+    await userEvent.click(screen.getByRole('option', { name: 'Tag key' }));
+    await userEvent.type(filter, 'Owner');
+    await userEvent.click(screen.getByText('Use: Tag key = Owner'));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        '/api/v1/hosted-zones?tag_key=Owner&sort=name&page=1&page_size=10',
+        expect.anything(),
+      ),
     );
   });
 

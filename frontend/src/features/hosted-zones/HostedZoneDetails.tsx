@@ -10,17 +10,23 @@ import Link from '@cloudscape-design/components/link';
 import Skeleton from '@cloudscape-design/components/skeleton';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
+import Table, { type TableProps } from '@cloudscape-design/components/table';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { RecordSetsTable } from '@/features/records/RecordSetsTable';
 import { useHelpPanel } from '@/features/shell/help';
 import { ROUTES } from '@/features/shell/navigation';
 import { ApiError } from '@/lib/api/errors';
-import type { HostedZoneDetail } from '@/lib/api/types';
+import type { HostedZoneDetail, HostedZoneTag } from '@/lib/api/types';
 import { useHostedZone } from './api';
 import { displayTimestamp, displayZoneName, displayZoneType } from './format';
 import { DeleteHostedZoneModal, EditHostedZoneModal } from './HostedZoneModals';
 import { AWS_REGIONS } from './regions';
+
+const TAG_COLUMNS: TableProps.ColumnDefinition<HostedZoneTag>[] = [
+  { id: 'key', header: 'Key', cell: (tag) => tag.key, isRowHeader: true },
+  { id: 'value', header: 'Value', cell: (tag) => tag.value || '-' },
+];
 
 export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
   const router = useRouter();
@@ -92,6 +98,19 @@ export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
           >
             <KeyValuePairs columns={3} items={detailItems(zone)} />
           </ExpandableSection>
+          <Table
+            variant="container"
+            trackBy="key"
+            columnDefinitions={TAG_COLUMNS}
+            items={zone.tags ?? []}
+            empty={
+              <Box textAlign="center">
+                <b>No tags</b>
+                <Box variant="p">This hosted zone has no tags.</Box>
+              </Box>
+            }
+            header={<Header counter={`(${zone.tags?.length ?? 0})`}>Tags</Header>}
+          />
           <RecordSetsTable zoneId={zone.id} zoneName={displayZoneName(zone.name)} />
         </SpaceBetween>
       </ContentLayout>

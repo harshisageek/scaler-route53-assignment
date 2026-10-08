@@ -8,11 +8,19 @@ from collections.abc import Sequence
 from sqlalchemy import ColumnElement, delete, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import HostedZone, RecordSet
+from app.models import HostedZone, HostedZoneTag, RecordSet
 
 
 def search_hosted_zones(
-    db: Session, owner_id: int, *, q: str | None, sort: str, offset: int, limit: int
+    db: Session,
+    owner_id: int,
+    *,
+    q: str | None,
+    tag_key: str | None,
+    tag_value: str | None,
+    sort: str,
+    offset: int,
+    limit: int,
 ) -> tuple[Sequence[tuple[HostedZone, int]], int]:
     """One page of the owner's zones with their record counts, plus the total match count.
 
@@ -28,6 +36,13 @@ def search_hosted_zones(
                 HostedZone.comment.ilike(pattern, escape="\\"),
             )
         )
+    if tag_key is not None or tag_value is not None:
+        tag_filters: list[ColumnElement[bool]] = [HostedZoneTag.hosted_zone_id == HostedZone.id]
+        if tag_key is not None:
+            tag_filters.append(HostedZoneTag.key == tag_key)
+        if tag_value is not None:
+            tag_filters.append(HostedZoneTag.value == tag_value)
+        filters.append(select(HostedZoneTag.hosted_zone_id).where(*tag_filters).exists())
 
     total = db.scalar(select(func.count()).select_from(HostedZone).where(*filters)) or 0
 
@@ -73,6 +88,26 @@ def add_hosted_zone(db: Session, zone: HostedZone) -> HostedZone:
     db.add(zone)
     db.flush()
     return zone
+
+
+def get_tags_by_zone_ids(db: Session, zone_ids: Sequence[str]) -> dict[str, list[HostedZoneTag]]:
+    tags: dict[str, list[HostedZoneTag]] = {zone_id: [] for zone_id in zone_ids}
+    if not zone_ids:
+        return tags
+    statement = (
+        select(HostedZoneTag)
+        .where(HostedZoneTag.hosted_zone_id.in_(zone_ids))
+        .order_by(HostedZoneTag.key)
+    )
+    for tag in db.scalars(statement):
+        tags[tag.hosted_zone_id].append(tag)
+    return tags
+
+
+def replace_tags(db: Session, zone_id: str, tags: Sequence[tuple[str, str]]) -> None:
+    db.execute(delete(HostedZoneTag).where(HostedZoneTag.hosted_zone_id == zone_id))
+    db.add_all(HostedZoneTag(hosted_zone_id=zone_id, key=key, value=value) for key, value in tags)
+    db.flush()
 
 
 def delete_hosted_zone(db: Session, zone: HostedZone) -> None:
