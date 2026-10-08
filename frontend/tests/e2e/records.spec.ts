@@ -41,7 +41,7 @@ test('a record can be created, edited, found and deleted', async ({ page }) => {
   await page.reload();
 
   row = page.getByRole('row', { name: /www\.records\.example\.com.*192\.0\.2\.10/ });
-  await row.getByRole('radio').check();
+  await row.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Edit' }).last().click();
   const editDialog = page.getByRole('dialog', { name: 'Edit record' });
   await editDialog.getByRole('textbox', { name: 'Value' }).fill('192.0.2.20');
@@ -52,7 +52,7 @@ test('a record can be created, edited, found and deleted', async ({ page }) => {
   await expect(page.getByText('192.0.2.20')).toBeVisible();
 
   row = page.getByRole('row', { name: /www\.records\.example\.com.*192\.0\.2\.20/ });
-  await row.getByRole('radio').check();
+  await row.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Delete' }).last().click();
   const deleteDialog = page.getByRole('dialog', { name: 'Delete record' });
   await deleteDialog.getByRole('button', { name: 'Delete' }).click();
@@ -90,7 +90,7 @@ test('default records are protected and CNAME mistakes stay in the form', async 
 
   await page.goto(`/route53/hosted-zones/${zone.id}`);
   const nsRow = page.getByRole('row', { name: /protected\.example\.com.*NS/ });
-  await nsRow.getByRole('radio').check();
+  await nsRow.getByRole('checkbox').check();
   await expect(page.getByRole('button', { name: 'Edit' }).last()).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Delete' }).last()).toBeDisabled();
 
@@ -249,4 +249,34 @@ test('a hosted zone can be exported as BIND and JSON files', async ({ page }) =>
   expect(json.records.some((record) => record.name === 'www.export.example.com.')).toBe(
     true,
   );
+});
+
+test('multiple records can be deleted in one atomic batch', async ({ page }) => {
+  await signUp(page, uniqueEmail());
+  const created = await page.request.post('/api/v1/hosted-zones', {
+    data: { name: 'bulk.example.com' },
+  });
+  const zone = (await created.json()) as { id: string };
+  for (const [name, value] of [
+    ['one', '192.0.2.1'],
+    ['two', '192.0.2.2'],
+  ]) {
+    const response = await page.request.post(`/api/v1/hosted-zones/${zone.id}/records`, {
+      data: { name, type: 'A', ttl: 300, values: [value] },
+    });
+    expect(response.ok()).toBeTruthy();
+  }
+  await page.goto(`/route53/hosted-zones/${zone.id}`);
+
+  const one = page.getByRole('row', { name: /one\.bulk\.example\.com/ });
+  const two = page.getByRole('row', { name: /two\.bulk\.example\.com/ });
+  await one.getByRole('checkbox').check();
+  await two.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Delete (2)' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Delete 2 record sets' });
+  await dialog.getByRole('button', { name: 'Delete record sets' }).click();
+
+  await expect(page.getByText('2 record sets were successfully deleted.')).toBeVisible();
+  await expect(one).toHaveCount(0);
+  await expect(two).toHaveCount(0);
 });

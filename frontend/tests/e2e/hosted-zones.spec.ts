@@ -93,6 +93,31 @@ test('a zone description can be edited and an empty zone can be deleted', async 
   ).toHaveCount(0);
 });
 
+test('multiple empty hosted zones can be deleted in one atomic batch', async ({
+  page,
+}) => {
+  await signUp(page, uniqueEmail());
+  for (const name of ['one.bulk-zone.example.com', 'two.bulk-zone.example.com']) {
+    const response = await page.request.post('/api/v1/hosted-zones', {
+      data: { name },
+    });
+    expect(response.ok()).toBeTruthy();
+  }
+  await page.goto('/route53/hosted-zones');
+
+  const one = page.getByRole('row', { name: /one\.bulk-zone\.example\.com/ });
+  const two = page.getByRole('row', { name: /two\.bulk-zone\.example\.com/ });
+  await one.getByRole('checkbox').check();
+  await two.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Delete (2)' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Delete 2 hosted zones' });
+  await dialog.getByRole('button', { name: 'Delete hosted zones' }).click();
+
+  await expect(page.getByText('2 hosted zones were successfully deleted.')).toBeVisible();
+  await expect(one).toHaveCount(0);
+  await expect(two).toHaveCount(0);
+});
+
 test('the hosted zones list searches and sorts on the server', async ({ page }) => {
   await signUp(page, uniqueEmail());
   for (const name of ['alpha.example.com', 'gamma.example.com', 'beta.example.com']) {

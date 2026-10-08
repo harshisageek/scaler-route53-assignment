@@ -35,6 +35,10 @@ export type AliasTargetType = NonNullable<RecordSet['alias_target_type']>;
 export type BindImportPreview = Schemas['BindImportPreview'];
 export type BindImportRecord = Schemas['BindImportRecord'];
 export type BindImportResult = Schemas['BindImportResult'];
+export type RecordSetChangeBatch = Schemas['RecordSetChangeBatch'];
+export type BatchResult = Schemas['BatchResult'];
+export type HostedZoneDeleteBatch = Schemas['HostedZoneDeleteBatch'];
+export type HostedZoneDeleteResult = Schemas['HostedZoneDeleteResult'];
 
 export type User = Schemas['UserOut'];
 export type SignInRequest = Schemas['SignInRequest'];

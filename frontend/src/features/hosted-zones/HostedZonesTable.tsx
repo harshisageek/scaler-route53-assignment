@@ -21,6 +21,7 @@ import {
 } from '@/features/shell/TablePreferences';
 import type { HostedZone, HostedZoneSort } from '@/lib/api/types';
 import { useHostedZones } from './api';
+import { BulkDeleteHostedZonesModal } from './BulkDeleteHostedZonesModal';
 import { displayZoneName, displayZoneType } from './format';
 import { DeleteHostedZoneModal, EditHostedZoneModal } from './HostedZoneModals';
 
@@ -167,7 +168,7 @@ export function HostedZonesTable() {
   const [query, setQuery] = useState<PropertyFilterProps.Query>(EMPTY_QUERY);
   const [sort, setSort] = useState<HostedZoneSort>('name');
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<HostedZone>();
+  const [selected, setSelected] = useState<HostedZone[]>([]);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const params = useMemo(() => {
@@ -198,6 +199,7 @@ export function HostedZonesTable() {
   );
   const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
   const hasFilters = query.tokens.length > 0;
+  const selectedZone = selected.length === 1 ? selected[0] : undefined;
 
   const clearFilter = () => {
     setQuery(EMPTY_QUERY);
@@ -209,9 +211,9 @@ export function HostedZonesTable() {
       <Table
         variant="full-page"
         trackBy="id"
-        selectionType="single"
-        selectedItems={selected ? [selected] : []}
-        onSelectionChange={({ detail }) => setSelected(detail.selectedItems[0])}
+        selectionType="multi"
+        selectedItems={selected}
+        onSelectionChange={({ detail }) => setSelected(detail.selectedItems)}
         columnDefinitions={displayedColumns}
         items={data?.items ?? []}
         loading={isPending}
@@ -270,16 +272,21 @@ export function HostedZonesTable() {
             actions={
               <SpaceBetween direction="horizontal" size="xs">
                 <Button
-                  disabled={!selected}
-                  onClick={() => selected && router.push(ROUTES.hostedZone(selected.id))}
+                  disabled={!selectedZone}
+                  onClick={() =>
+                    selectedZone && router.push(ROUTES.hostedZone(selectedZone.id))
+                  }
                 >
                   View details
                 </Button>
-                <Button disabled={!selected} onClick={() => setEditing(true)}>
+                <Button disabled={!selectedZone} onClick={() => setEditing(true)}>
                   Edit
                 </Button>
-                <Button disabled={!selected} onClick={() => setDeleting(true)}>
-                  Delete
+                <Button
+                  disabled={selected.length === 0}
+                  onClick={() => setDeleting(true)}
+                >
+                  Delete{selected.length > 1 ? ` (${selected.length})` : ''}
                 </Button>
                 <Button
                   variant="primary"
@@ -298,17 +305,30 @@ export function HostedZonesTable() {
           </Header>
         }
       />
-      {selected && editing && (
-        <EditHostedZoneModal zone={selected} onDismiss={() => setEditing(false)} />
+      {selectedZone && editing && (
+        <EditHostedZoneModal zone={selectedZone} onDismiss={() => setEditing(false)} />
       )}
-      {selected && deleting && (
+      {selectedZone && selected.length === 1 && deleting && (
         <DeleteHostedZoneModal
-          zone={selected}
+          zone={selectedZone}
           onDismiss={() => setDeleting(false)}
           onDeleted={() => {
             setDeleting(false);
-            setSelected(undefined);
+            setSelected([]);
             if ((data?.items.length ?? 0) === 1 && page > 1) setPage(page - 1);
+          }}
+        />
+      )}
+      {selected.length > 1 && deleting && (
+        <BulkDeleteHostedZonesModal
+          zones={selected}
+          onDismiss={() => setDeleting(false)}
+          onDeleted={() => {
+            setDeleting(false);
+            setSelected([]);
+            if ((data?.items.length ?? 0) === selected.length && page > 1) {
+              setPage(page - 1);
+            }
           }}
         />
       )}

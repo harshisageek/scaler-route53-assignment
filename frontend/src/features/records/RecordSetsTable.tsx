@@ -25,6 +25,7 @@ import type {
 } from '@/lib/api/types';
 import { useRecordSets } from './api';
 import { BindImportModal } from './BindImportModal';
+import { BulkDeleteRecordSetsModal } from './BulkDeleteRecordSetsModal';
 import { DeleteRecordSetModal } from './DeleteRecordSetModal';
 import { RecordSetModal } from './RecordSetModal';
 import { RECORD_TYPES } from './recordTypes';
@@ -153,7 +154,7 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
   const [query, setQuery] = useState<PropertyFilterProps.Query>(EMPTY_QUERY);
   const [sort, setSort] = useState<RecordSetSort>('name');
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<RecordSet>();
+  const [selected, setSelected] = useState<RecordSet[]>([]);
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -184,19 +185,20 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
   const sortingColumn = COLUMNS.find((column) => column.sortingField === sortField);
   const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
   const hasFilters = query.tokens.length > 0;
-  const isDefaultRecord =
-    selected !== undefined &&
-    selected.name === `${zoneName}.` &&
-    (selected.type === 'NS' || selected.type === 'SOA');
+  const selectedRecord = selected.length === 1 ? selected[0] : undefined;
+  const includesDefaultRecord = selected.some(
+    (record) =>
+      record.name === `${zoneName}.` && (record.type === 'NS' || record.type === 'SOA'),
+  );
 
   return (
     <>
       <Table
         variant="container"
         trackBy="id"
-        selectionType="single"
-        selectedItems={selected ? [selected] : []}
-        onSelectionChange={({ detail }) => setSelected(detail.selectedItems[0])}
+        selectionType="multi"
+        selectedItems={selected}
+        onSelectionChange={({ detail }) => setSelected(detail.selectedItems)}
         columnDefinitions={displayedColumns}
         items={data?.items ?? []}
         loading={isPending}
@@ -276,16 +278,20 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
             actions={
               <SpaceBetween direction="horizontal" size="xs">
                 <Button
-                  disabled={!selected || selected.type === 'SOA' || isDefaultRecord}
+                  disabled={
+                    !selectedRecord ||
+                    selectedRecord.type === 'SOA' ||
+                    includesDefaultRecord
+                  }
                   onClick={() => setEditing(true)}
                 >
                   Edit
                 </Button>
                 <Button
-                  disabled={!selected || isDefaultRecord}
+                  disabled={selected.length === 0 || includesDefaultRecord}
                   onClick={() => setDeleting(true)}
                 >
-                  Delete
+                  Delete{selected.length > 1 ? ` (${selected.length})` : ''}
                 </Button>
                 <Button onClick={() => setImporting(true)}>Import records</Button>
                 <Button variant="primary" onClick={() => setCreating(true)}>
@@ -309,24 +315,38 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
       {importing && (
         <BindImportModal zoneId={zoneId} onDismiss={() => setImporting(false)} />
       )}
-      {selected && editing && (
+      {selectedRecord && editing && (
         <RecordSetModal
           zoneId={zoneId}
           zoneName={zoneName}
           records={data?.items ?? []}
-          record={selected}
+          record={selectedRecord}
           onDismiss={() => setEditing(false)}
         />
       )}
-      {selected && deleting && (
+      {selectedRecord && selected.length === 1 && deleting && (
         <DeleteRecordSetModal
           zoneId={zoneId}
-          record={selected}
+          record={selectedRecord}
           onDismiss={() => setDeleting(false)}
           onDeleted={() => {
             setDeleting(false);
-            setSelected(undefined);
+            setSelected([]);
             if ((data?.items.length ?? 0) === 1 && page > 1) setPage(page - 1);
+          }}
+        />
+      )}
+      {selected.length > 1 && deleting && (
+        <BulkDeleteRecordSetsModal
+          zoneId={zoneId}
+          records={selected}
+          onDismiss={() => setDeleting(false)}
+          onDeleted={() => {
+            setDeleting(false);
+            setSelected([]);
+            if ((data?.items.length ?? 0) === selected.length && page > 1) {
+              setPage(page - 1);
+            }
           }}
         />
       )}
