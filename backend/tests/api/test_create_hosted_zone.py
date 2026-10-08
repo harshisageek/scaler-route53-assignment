@@ -68,10 +68,11 @@ def test_the_zone_is_not_saved_if_its_default_records_fail(
 
     monkeypatch.setattr(record_sets, "add_record_sets", fail)
 
-    with pytest.raises(RuntimeError):
-        alice.post(URL, json={"name": "example.com"})
+    response = alice.post(URL, json={"name": "example.com"})
 
     db_session.rollback()
+    assert response.status_code == 500
+    assert response.json()["error"]["code"] == "InternalServerError"
     assert db_session.scalars(select(HostedZone)).all() == []
 
 

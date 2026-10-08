@@ -122,7 +122,7 @@ describe('HostedZonesTable', () => {
       ),
     );
 
-    await userEvent.click(screen.getByRole('button', { name: '2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Page 2' }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/v1/hosted-zones?sort=-name&page=2&page_size=10',

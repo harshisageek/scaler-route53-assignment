@@ -199,6 +199,20 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
         selectionType="multi"
         selectedItems={selected}
         onSelectionChange={({ detail }) => setSelected(detail.selectedItems)}
+        ariaLabels={{
+          tableLabel: 'DNS records',
+          selectionGroupLabel: 'DNS record selection',
+          allItemsSelectionLabel: ({ selectedItems }) =>
+            selectedItems.length === (data?.items.length ?? 0)
+              ? 'Deselect all records'
+              : 'Select all records',
+          itemSelectionLabel: ({ selectedItems }, item) =>
+            `${
+              selectedItems.some((selectedItem) => selectedItem.id === item.id)
+                ? 'Deselect'
+                : 'Select'
+            } ${item.name} ${item.type}`,
+        }}
         columnDefinitions={displayedColumns}
         items={data?.items ?? []}
         loading={isPending}
@@ -233,6 +247,12 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
           <Pagination
             currentPageIndex={page}
             pagesCount={pagesCount}
+            ariaLabels={{
+              paginationLabel: 'DNS record pages',
+              previousPageLabel: 'Previous page',
+              nextPageLabel: 'Next page',
+              pageLabel: (pageNumber) => `Page ${pageNumber}`,
+            }}
             onChange={({ detail }) => setPage(detail.currentPageIndex)}
           />
         }

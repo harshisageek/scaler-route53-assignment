@@ -214,6 +214,20 @@ export function HostedZonesTable() {
         selectionType="multi"
         selectedItems={selected}
         onSelectionChange={({ detail }) => setSelected(detail.selectedItems)}
+        ariaLabels={{
+          tableLabel: 'Hosted zones',
+          selectionGroupLabel: 'Hosted zone selection',
+          allItemsSelectionLabel: ({ selectedItems }) =>
+            selectedItems.length === (data?.items.length ?? 0)
+              ? 'Deselect all hosted zones'
+              : 'Select all hosted zones',
+          itemSelectionLabel: ({ selectedItems }, item) =>
+            `${
+              selectedItems.some((selectedItem) => selectedItem.id === item.id)
+                ? 'Deselect'
+                : 'Select'
+            } ${displayZoneName(item.name)}`,
+        }}
         columnDefinitions={displayedColumns}
         items={data?.items ?? []}
         loading={isPending}
@@ -248,6 +262,12 @@ export function HostedZonesTable() {
           <Pagination
             currentPageIndex={page}
             pagesCount={pagesCount}
+            ariaLabels={{
+              paginationLabel: 'Hosted zones pages',
+              previousPageLabel: 'Previous page',
+              nextPageLabel: 'Next page',
+              pageLabel: (pageNumber) => `Page ${pageNumber}`,
+            }}
             onChange={({ detail }) => setPage(detail.currentPageIndex)}
           />
         }
