@@ -7,12 +7,12 @@ not operate authoritative DNS servers or change real AWS resources.
 [![CI](https://github.com/harshisageek/scaler-route53-assignment/actions/workflows/ci.yml/badge.svg)](https://github.com/harshisageek/scaler-route53-assignment/actions/workflows/ci.yml)
 
 - Repository: <https://github.com/harshisageek/scaler-route53-assignment>
-- Live demo: not currently deployed; use the one-command Docker setup below
+- Live demo: <https://route53-clone-red.vercel.app>
 - Local API docs: <http://localhost:8000/docs>
 
 ## What is included
 
-- Multi-user sign-up, sign-in, sign-out, owner isolation, and a resettable demo account
+- Multi-user sign-up, sign-in, sign-out, owner isolation, and private demo sessions
 - Public and private hosted-zone creation, details, editing, deletion, tags, search, sorting, and pagination
 - DNS record CRUD for A, AAAA, CNAME, TXT, MX, NS, PTR, SRV, and CAA
 - Route 53 rules for apex CNAMEs, conflicting names, protected NS/SOA records, and field-level validation
@@ -256,8 +256,10 @@ pagination remains responsive.
 
 ## Deployment
 
-The repository contains deploy-ready configuration, but no public deployment is
-currently attached to it.
+The production frontend is deployed on Vercel at
+<https://route53-clone-red.vercel.app>. It proxies API requests to the FastAPI
+service on Render. Litestream continuously backs up the SQLite database to a
+private Supabase Storage bucket and restores it when Render starts.
 
 1. Import `frontend/` into Vercel and set `BACKEND_URL` to the Render service.
 2. Create the Render Blueprint from `render.yaml`.
