@@ -27,6 +27,8 @@ out/
 .turbo/
 *.tsbuildinfo
 next-env.d.ts
+# Intermediate file of `make api-types`; only the generated schema.d.ts is kept
+frontend/openapi.json
 coverage/
 playwright-report/
 test-results/

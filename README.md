@@ -53,6 +53,7 @@ cd frontend && cp .env.example .env.local && pnpm dev
 | `make test`         | pytest and Vitest                               |
 | `make e2e`          | Playwright, against a production build          |
 | `make check`        | format check, lint, typecheck and tests         |
+| `make api-types`    | regenerate the frontend's API types from the backend's OpenAPI schema |
 
 ## Project layout
 

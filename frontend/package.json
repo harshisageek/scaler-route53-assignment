@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "e2e": "playwright test",
-    "generate:api": "openapi-typescript http://localhost:8000/openapi.json -o src/lib/api/schema.d.ts"
+    "generate:api": "openapi-typescript openapi.json -o src/lib/api/schema.d.ts"
   },
   "dependencies": {
     "@cloudscape-design/collection-hooks": "^1.0.110",

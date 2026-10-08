@@ -10,7 +10,7 @@ BACKEND  := cd backend &&
 FRONTEND := cd frontend &&
 
 .DEFAULT_GOAL := help
-.PHONY: help install dev down format format-check lint typecheck test e2e check
+.PHONY: help install dev down api-types format format-check lint typecheck test e2e check
 
 help: ## List the available targets
 	@grep -E '^[a-z-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  %-14s %s\n", $$1, $$2}'
@@ -24,6 +24,10 @@ dev: ## Start backend and frontend with Docker Compose
 
 down: ## Stop the Docker Compose stack
 	docker compose down
+
+api-types: ## Regenerate the frontend's API types from the backend's OpenAPI schema
+	$(BACKEND) uv run python -m scripts.export_openapi ../frontend/openapi.json
+	$(FRONTEND) pnpm generate:api && rm openapi.json
 
 format: ## Rewrite files to match the formatters
 	$(BACKEND) uv run ruff format .
