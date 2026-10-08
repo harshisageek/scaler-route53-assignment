@@ -8,6 +8,7 @@ import {
   hashKey,
 } from '@tanstack/react-query';
 import { authKeys } from '@/features/auth/api';
+import { ThemeProvider } from '@/features/shell/theme';
 import { ApiError } from '@/lib/api/errors';
 
 /**
@@ -45,5 +46,9 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     return client;
   });
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  return (
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </ThemeProvider>
+  );
 }

@@ -8,6 +8,9 @@ vi.mock('next/navigation', () => ({
   useRouter: () => router,
   usePathname: () => '/route53/hosted-zones/Z1',
 }));
+vi.mock('./theme', () => ({
+  useTheme: () => ({ mode: 'light', toggleMode: vi.fn() }),
+}));
 
 function jsonResponse(status: number, body: unknown): Response {
   return { ok: status < 400, status, json: async () => body } as Response;
