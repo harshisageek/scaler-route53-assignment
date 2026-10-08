@@ -92,6 +92,14 @@ def get_record_set(db: Session, zone_id: str, record_set_id: int) -> RecordSet |
     )
 
 
+def all_by_zone(db: Session, zone_id: str) -> Sequence[RecordSet]:
+    return db.scalars(
+        select(RecordSet)
+        .where(RecordSet.hosted_zone_id == zone_id)
+        .order_by(RecordSet.name, RecordSet.type, RecordSet.id)
+    ).all()
+
+
 def exists_by_name_and_type(
     db: Session,
     zone_id: str,

@@ -161,6 +161,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hosted-zones/{zone_id}/records/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Bind Import */
+        post: operations["preview_bind_import_api_v1_hosted_zones__zone_id__records_import_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hosted-zones/{zone_id}/records/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Bind Import */
+        post: operations["apply_bind_import_api_v1_hosted_zones__zone_id__records_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/hosted-zones/{zone_id}/records/{record_set_id}": {
         parameters: {
             query?: never;
@@ -184,6 +218,54 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** BindImportPreview */
+        BindImportPreview: {
+            /** File Name */
+            file_name: string;
+            /** Records */
+            records: components["schemas"]["BindImportRecord"][];
+            /** Add Count */
+            add_count: number;
+            /** Already Present Count */
+            already_present_count: number;
+            /** Unsupported Count */
+            unsupported_count: number;
+        };
+        /** BindImportRecord */
+        BindImportRecord: {
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Ttl */
+            ttl: number;
+            /** Values */
+            values: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "add" | "already_present" | "unsupported";
+            /** Reason */
+            reason?: string | null;
+        };
+        /** BindImportResult */
+        BindImportResult: {
+            /** Imported Count */
+            imported_count: number;
+            /** Skipped Count */
+            skipped_count: number;
+        };
+        /** Body_apply_bind_import_api_v1_hosted_zones__zone_id__records_import_post */
+        Body_apply_bind_import_api_v1_hosted_zones__zone_id__records_import_post: {
+            /** File */
+            file: string;
+        };
+        /** Body_preview_bind_import_api_v1_hosted_zones__zone_id__records_import_preview_post */
+        Body_preview_bind_import_api_v1_hosted_zones__zone_id__records_import_preview_post: {
+            /** File */
+            file: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -984,6 +1066,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RecordSetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_bind_import_api_v1_hosted_zones__zone_id__records_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_preview_bind_import_api_v1_hosted_zones__zone_id__records_import_preview_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BindImportPreview"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_bind_import_api_v1_hosted_zones__zone_id__records_import_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_apply_bind_import_api_v1_hosted_zones__zone_id__records_import_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BindImportResult"];
                 };
             };
             /** @description Validation Error */
