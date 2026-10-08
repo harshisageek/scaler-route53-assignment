@@ -42,6 +42,31 @@ def normalize_zone_name(raw: str) -> str:
     return f"{name}."
 
 
+def normalize_record_name(raw: str, zone_name: str) -> str:
+    """Return an absolute record name within ``zone_name``.
+
+    Route 53 accepts ``www``, ``www.example.com`` and ``www.example.com.`` on
+    the example.com zone. A blank name and ``@`` both mean the zone apex.
+    """
+    value = raw.strip()
+    if not value or value == "@":
+        return zone_name
+
+    if value.endswith("."):
+        name = normalize_zone_name(value)
+        if name != zone_name and not name.endswith(f".{zone_name}"):
+            raise InvalidDomainNameError("The record name must be inside the hosted zone.")
+        return name
+
+    try:
+        name = normalize_zone_name(value)
+    except InvalidDomainNameError:
+        name = ""
+    if name == zone_name or name.endswith(f".{zone_name}"):
+        return name
+    return normalize_zone_name(f"{value}.{zone_name}")
+
+
 def _to_ascii(name: str) -> str:
     if name.isascii():
         return name

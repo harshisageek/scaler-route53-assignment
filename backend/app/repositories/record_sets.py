@@ -3,9 +3,9 @@
 Callers check that the zone belongs to the current user before reaching these.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
-from sqlalchemy import and_, func, not_, select
+from sqlalchemy import String, and_, func, not_, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import HostedZone, RecordSet
@@ -38,3 +38,79 @@ def count_non_default(db: Session, zone: HostedZone) -> int:
         .where(RecordSet.hosted_zone_id == zone.id, not_(is_default))
     )
     return db.scalar(statement) or 0
+
+
+def search_record_sets(
+    db: Session,
+    zone_id: str,
+    *,
+    q: str | None,
+    record_type: str | None,
+    sort: str,
+    offset: int,
+    limit: int,
+) -> tuple[Sequence[RecordSet], int]:
+    filters = [RecordSet.hosted_zone_id == zone_id]
+    if q:
+        pattern = f"%{_escape_like(q.strip())}%"
+        filters.append(
+            or_(
+                RecordSet.name.ilike(pattern, escape="\\"),
+                RecordSet.values.cast(String).ilike(pattern, escape="\\"),
+            )
+        )
+    if record_type:
+        filters.append(RecordSet.type == record_type)
+
+    total = db.scalar(select(func.count()).select_from(RecordSet).where(*filters)) or 0
+    columns = {"name": RecordSet.name, "type": RecordSet.type, "ttl": RecordSet.ttl}
+    column = columns[sort.removeprefix("-")]
+    statement = (
+        select(RecordSet)
+        .where(*filters)
+        .order_by(
+            column.desc() if sort.startswith("-") else column.asc(),
+            RecordSet.name,
+            RecordSet.type,
+            RecordSet.id,
+        )
+        .offset(offset)
+        .limit(limit)
+    )
+    return db.scalars(statement).all(), total
+
+
+def get_record_set(db: Session, zone_id: str, record_set_id: int) -> RecordSet | None:
+    return db.scalar(
+        select(RecordSet).where(
+            RecordSet.hosted_zone_id == zone_id,
+            RecordSet.id == record_set_id,
+        )
+    )
+
+
+def exists_by_name_and_type(
+    db: Session,
+    zone_id: str,
+    name: str,
+    record_type: str,
+    *,
+    exclude_id: int | None = None,
+) -> bool:
+    filters = [
+        RecordSet.hosted_zone_id == zone_id,
+        RecordSet.name == name,
+        RecordSet.type == record_type,
+    ]
+    if exclude_id is not None:
+        filters.append(RecordSet.id != exclude_id)
+    return db.scalar(select(RecordSet.id).where(*filters).limit(1)) is not None
+
+
+def delete_record_set(db: Session, record_set: RecordSet) -> None:
+    db.delete(record_set)
+    db.flush()
+
+
+def _escape_like(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

@@ -1,5 +1,9 @@
 import pytest
-from app.services.validation.domain_names import InvalidDomainNameError, normalize_zone_name
+from app.services.validation.domain_names import (
+    InvalidDomainNameError,
+    normalize_record_name,
+    normalize_zone_name,
+)
 
 
 @pytest.mark.parametrize(
@@ -46,3 +50,24 @@ def test_the_longest_allowed_name_is_accepted() -> None:
 
     assert len(name) == 253
     assert normalize_zone_name(name) == f"{name}."
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("", "example.com."),
+        ("@", "example.com."),
+        ("www", "www.example.com."),
+        ("WWW.Example.COM", "www.example.com."),
+        ("www.example.com.", "www.example.com."),
+        ("_dmarc", "_dmarc.example.com."),
+        ("bücher", "xn--bcher-kva.example.com."),
+    ],
+)
+def test_record_names_can_be_relative_or_absolute(raw: str, expected: str) -> None:
+    assert normalize_record_name(raw, "example.com.") == expected
+
+
+def test_an_absolute_record_name_must_be_inside_the_zone() -> None:
+    with pytest.raises(InvalidDomainNameError, match="inside the hosted zone"):
+        normalize_record_name("www.other.example.", "example.com.")

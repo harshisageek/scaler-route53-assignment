@@ -11,6 +11,7 @@ import Spinner from '@cloudscape-design/components/spinner';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { RecordSetsTable } from '@/features/records/RecordSetsTable';
 import { ROUTES } from '@/features/shell/navigation';
 import { ApiError } from '@/lib/api/errors';
 import type { HostedZoneDetail } from '@/lib/api/types';
@@ -71,13 +72,16 @@ export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
           </Header>
         }
       >
-        <ExpandableSection
-          variant="container"
-          defaultExpanded
-          headerText="Hosted zone details"
-        >
-          <KeyValuePairs columns={3} items={detailItems(zone)} />
-        </ExpandableSection>
+        <SpaceBetween size="l">
+          <ExpandableSection
+            variant="container"
+            defaultExpanded
+            headerText="Hosted zone details"
+          >
+            <KeyValuePairs columns={3} items={detailItems(zone)} />
+          </ExpandableSection>
+          <RecordSetsTable zoneId={zone.id} zoneName={displayZoneName(zone.name)} />
+        </SpaceBetween>
       </ContentLayout>
       {editing && <EditHostedZoneModal zone={zone} onDismiss={() => setEditing(false)} />}
       {deleting && (
