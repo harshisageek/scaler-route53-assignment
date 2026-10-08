@@ -151,3 +151,28 @@ test('weighted and failover routing policies are stored and displayed', async ({
     }),
   ).toBeVisible();
 });
+
+test('an apex alias can route to a mocked AWS target', async ({ page }) => {
+  await signUp(page, uniqueEmail());
+  const created = await page.request.post('/api/v1/hosted-zones', {
+    data: { name: 'alias.example.com' },
+  });
+  const zone = (await created.json()) as { id: string };
+  await page.goto(`/route53/hosted-zones/${zone.id}`);
+
+  await page.getByRole('button', { name: 'Create record' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Create record' });
+  await dialog.getByRole('checkbox', { name: 'Alias' }).check();
+  await dialog.getByRole('button', { name: /Choose an endpoint/ }).click();
+  await page.getByRole('option', { name: /CloudFront distribution/ }).click();
+  await dialog.getByRole('button', { name: /Choose a target/ }).click();
+  await page.getByRole('option', { name: 'd111111abcdef8.cloudfront.net.' }).click();
+  await dialog.getByRole('checkbox', { name: 'Evaluate target health' }).check();
+  await dialog.getByRole('button', { name: 'Create record' }).click();
+
+  await expect(
+    page.getByRole('row', {
+      name: /alias\.example\.com.*A.*Alias to d111111abcdef8\.cloudfront\.net\..*Evaluate target health: Yes/,
+    }),
+  ).toBeVisible();
+});

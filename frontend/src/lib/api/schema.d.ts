@@ -379,7 +379,7 @@ export interface components {
              * Ttl
              * @example 300
              */
-            ttl: number;
+            ttl: number | null;
             /** Values */
             values: string[];
             /**
@@ -398,6 +398,20 @@ export interface components {
             region?: string | null;
             /** Geolocation */
             geolocation?: string | null;
+            /**
+             * Alias
+             * @default false
+             */
+            alias: boolean;
+            /** Alias Target Type */
+            alias_target_type?: ("cloudfront" | "s3-website" | "load-balancer" | "api-gateway" | "record") | null;
+            /** Alias Target */
+            alias_target?: string | null;
+            /**
+             * Evaluate Target Health
+             * @default false
+             */
+            evaluate_target_health: boolean;
         };
         /** RecordSetList */
         RecordSetList: {
@@ -422,7 +436,7 @@ export interface components {
              */
             type: "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA" | "SOA";
             /** Ttl */
-            ttl: number;
+            ttl: number | null;
             /** Values */
             values: string[];
             /**
@@ -440,6 +454,14 @@ export interface components {
             region: string | null;
             /** Geolocation */
             geolocation: string | null;
+            /** Alias */
+            alias: boolean;
+            /** Alias Target Type */
+            alias_target_type: ("cloudfront" | "s3-website" | "load-balancer" | "api-gateway" | "record") | null;
+            /** Alias Target */
+            alias_target: string | null;
+            /** Evaluate Target Health */
+            evaluate_target_health: boolean;
             /**
              * Created At
              * Format: date-time
@@ -468,7 +490,7 @@ export interface components {
              * Ttl
              * @example 300
              */
-            ttl: number;
+            ttl: number | null;
             /** Values */
             values: string[];
             /**
@@ -487,6 +509,20 @@ export interface components {
             region?: string | null;
             /** Geolocation */
             geolocation?: string | null;
+            /**
+             * Alias
+             * @default false
+             */
+            alias: boolean;
+            /** Alias Target Type */
+            alias_target_type?: ("cloudfront" | "s3-website" | "load-balancer" | "api-gateway" | "record") | null;
+            /** Alias Target */
+            alias_target?: string | null;
+            /**
+             * Evaluate Target Health
+             * @default false
+             */
+            evaluate_target_health: boolean;
         };
         /** SignInRequest */
         SignInRequest: {

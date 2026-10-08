@@ -42,18 +42,26 @@ const COLUMNS: TableProps.ColumnDefinition<RecordSet>[] = [
   {
     id: 'values',
     header: 'Value/Route traffic to',
-    cell: (record) => (
-      <ul className="plain-list">
-        {record.values.map((value, index) => (
-          <li key={`${index}-${value}`}>{value}</li>
-        ))}
-      </ul>
-    ),
+    cell: (record) =>
+      record.alias ? (
+        <div>
+          <div>Alias to {record.alias_target}</div>
+          <div>
+            Evaluate target health: {record.evaluate_target_health ? 'Yes' : 'No'}
+          </div>
+        </div>
+      ) : (
+        <ul className="plain-list">
+          {record.values.map((value, index) => (
+            <li key={`${index}-${value}`}>{value}</li>
+          ))}
+        </ul>
+      ),
   },
   {
     id: 'ttl',
     header: 'TTL (seconds)',
-    cell: (record) => record.ttl,
+    cell: (record) => record.ttl ?? '-',
     sortingField: 'ttl',
   },
   {
@@ -291,6 +299,7 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
         <RecordSetModal
           zoneId={zoneId}
           zoneName={zoneName}
+          records={data?.items ?? []}
           onDismiss={() => setCreating(false)}
         />
       )}
@@ -298,6 +307,7 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
         <RecordSetModal
           zoneId={zoneId}
           zoneName={zoneName}
+          records={data?.items ?? []}
           record={selected}
           onDismiss={() => setEditing(false)}
         />

@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, Integer, String
+from sqlalchemy import JSON, Boolean, CheckConstraint, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin
@@ -33,6 +33,10 @@ class RecordSet(TimestampMixin, Base):
     failover_role: Mapped[str | None] = mapped_column(String(9))
     region: Mapped[str | None] = mapped_column(String(32))
     geolocation: Mapped[str | None] = mapped_column(String(64))
+    alias: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    alias_target_type: Mapped[str | None] = mapped_column(String(20))
+    alias_target: Mapped[str | None] = mapped_column(String(255))
+    evaluate_target_health: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
         CheckConstraint("name = lower(name) AND name LIKE '%.'", name="name_is_canonical"),
@@ -49,6 +53,20 @@ class RecordSet(TimestampMixin, Base):
         CheckConstraint(
             "failover_role IS NULL OR failover_role IN ('PRIMARY', 'SECONDARY')",
             name="failover_role_value",
+        ),
+        CheckConstraint(
+            "alias_target_type IS NULL OR alias_target_type IN "
+            "('cloudfront', 's3-website', 'load-balancer', 'api-gateway', 'record')",
+            name="alias_target_type_value",
+        ),
+        CheckConstraint(
+            "(alias = 0 AND alias_target_type IS NULL AND alias_target IS NULL) OR "
+            "(alias = 1 AND alias_target_type IS NOT NULL AND alias_target IS NOT NULL)",
+            name="alias_target_fields",
+        ),
+        CheckConstraint(
+            "(alias = 0 AND ttl IS NOT NULL) OR (alias = 1 AND ttl IS NULL)",
+            name="alias_ttl",
         ),
         Index(
             "ix_record_sets_hosted_zone_name_type_identifier",

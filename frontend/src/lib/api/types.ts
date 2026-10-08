@@ -31,6 +31,7 @@ export type RecordType = RecordSet['type'];
 export type EditableRecordType = RecordSetCreate['type'];
 export type RoutingPolicy = RecordSet['routing_policy'];
 export type FailoverRole = NonNullable<RecordSet['failover_role']>;
+export type AliasTargetType = NonNullable<RecordSet['alias_target_type']>;
 
 export type User = Schemas['UserOut'];
 export type SignInRequest = Schemas['SignInRequest'];
