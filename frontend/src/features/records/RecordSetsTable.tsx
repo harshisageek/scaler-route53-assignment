@@ -3,6 +3,7 @@
 import Box from '@cloudscape-design/components/box';
 import Button from '@cloudscape-design/components/button';
 import Header from '@cloudscape-design/components/header';
+import Link from '@cloudscape-design/components/link';
 import Pagination from '@cloudscape-design/components/pagination';
 import PropertyFilter, {
   type PropertyFilterProps,
@@ -11,13 +12,17 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import Table, { type TableProps } from '@cloudscape-design/components/table';
 import { useMemo, useState } from 'react';
+import { useHelpPanel } from '@/features/shell/help';
+import {
+  type PreferenceColumn,
+  useTablePreferences,
+} from '@/features/shell/TablePreferences';
 import type { RecordSet, RecordSetSort, RecordType } from '@/lib/api/types';
 import { useRecordSets } from './api';
 import { DeleteRecordSetModal } from './DeleteRecordSetModal';
 import { RecordSetModal } from './RecordSetModal';
 import { RECORD_TYPES } from './recordTypes';
 
-const PAGE_SIZE = 10;
 const EMPTY_QUERY: PropertyFilterProps.Query = { operation: 'and', tokens: [] };
 
 const COLUMNS: TableProps.ColumnDefinition<RecordSet>[] = [
@@ -45,6 +50,13 @@ const COLUMNS: TableProps.ColumnDefinition<RecordSet>[] = [
     cell: (record) => record.ttl,
     sortingField: 'ttl',
   },
+];
+
+const PREFERENCE_COLUMNS: PreferenceColumn[] = [
+  { id: 'name', label: 'Record name', alwaysVisible: true },
+  { id: 'type', label: 'Type' },
+  { id: 'values', label: 'Value/Route traffic to' },
+  { id: 'ttl', label: 'TTL (seconds)' },
 ];
 
 const FILTER_PROPERTIES: PropertyFilterProps.FilteringProperty[] = [
@@ -94,6 +106,12 @@ interface Props {
 }
 
 export function RecordSetsTable({ zoneId, zoneName }: Props) {
+  const openHelp = useHelpPanel();
+  const { preferences, control: preferencesControl } = useTablePreferences(
+    'record-sets',
+    PREFERENCE_COLUMNS,
+  );
+  const pageSize = preferences.pageSize ?? 10;
   const [query, setQuery] = useState<PropertyFilterProps.Query>(EMPTY_QUERY);
   const [sort, setSort] = useState<RecordSetSort>('name');
   const [page, setPage] = useState(1);
@@ -109,13 +127,18 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
       type: typeof type === 'string' ? (type as RecordType) : undefined,
       sort,
       page,
-      page_size: PAGE_SIZE,
+      page_size: pageSize,
     };
-  }, [page, query.tokens, sort]);
+  }, [page, pageSize, query.tokens, sort]);
   const { data, error, isPending, refetch } = useRecordSets(zoneId, params);
+  const visibleColumns =
+    preferences.visibleContent ?? PREFERENCE_COLUMNS.map(({ id }) => id);
+  const displayedColumns = COLUMNS.filter(
+    (column) => column.id && visibleColumns.includes(column.id),
+  );
   const sortField = sort.startsWith('-') ? sort.slice(1) : sort;
   const sortingColumn = COLUMNS.find((column) => column.sortingField === sortField);
-  const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
+  const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
   const hasFilters = query.tokens.length > 0;
   const isDefaultRecord =
     selected !== undefined &&
@@ -130,10 +153,15 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
         selectionType="single"
         selectedItems={selected ? [selected] : []}
         onSelectionChange={({ detail }) => setSelected(detail.selectedItems[0])}
-        columnDefinitions={COLUMNS}
+        columnDefinitions={displayedColumns}
         items={data?.items ?? []}
         loading={isPending}
         loadingText="Loading records"
+        skeleton={{ totalRows: pageSize }}
+        wrapLines={preferences.wrapLines}
+        stripedRows={preferences.stripedRows}
+        contentDensity={preferences.contentDensity}
+        preferences={preferencesControl}
         sortingColumn={sortingColumn}
         sortingDescending={sort.startsWith('-')}
         onSortingChange={({ detail }) => {
@@ -196,6 +224,11 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
         header={
           <Header
             counter={data ? `(${data.total})` : undefined}
+            info={
+              <Link variant="info" onFollow={openHelp}>
+                Info
+              </Link>
+            }
             actions={
               <SpaceBetween direction="horizontal" size="xs">
                 <Button

@@ -3,9 +3,14 @@ import type { SideNavigationProps } from '@cloudscape-design/components/side-nav
 
 export const ROUTES = {
   home: '/route53',
+  dashboard: '/route53',
   hostedZones: '/route53/hosted-zones',
   createHostedZone: '/route53/hosted-zones/create',
   hostedZone: (zoneId: string) => `/route53/hosted-zones/${encodeURIComponent(zoneId)}`,
+  trafficPolicies: '/route53/traffic-policies',
+  healthChecks: '/route53/health-checks',
+  resolver: '/route53/resolver',
+  profiles: '/route53/profiles',
 } as const;
 
 export const NAV_HEADER: SideNavigationProps.Header = {
@@ -14,7 +19,17 @@ export const NAV_HEADER: SideNavigationProps.Header = {
 };
 
 export const NAV_ITEMS: SideNavigationProps.Item[] = [
+  { type: 'link', text: 'Dashboard', href: ROUTES.dashboard },
   { type: 'link', text: 'Hosted zones', href: ROUTES.hostedZones },
+  { type: 'link', text: 'Traffic policies', href: ROUTES.trafficPolicies },
+  { type: 'link', text: 'Health checks', href: ROUTES.healthChecks },
+  { type: 'divider' },
+  {
+    type: 'section',
+    text: 'Resolver',
+    items: [{ type: 'link', text: 'Resolver overview', href: ROUTES.resolver }],
+  },
+  { type: 'link', text: 'Profiles', href: ROUTES.profiles },
 ];
 
 const ROOT_CRUMB: BreadcrumbGroupProps.Item = { text: 'Route 53', href: ROUTES.home };
@@ -24,12 +39,23 @@ const ZONES_CRUMB: BreadcrumbGroupProps.Item = {
 };
 
 const CRUMBS_BY_PATH: Record<string, BreadcrumbGroupProps.Item[]> = {
+  [ROUTES.dashboard]: [ROOT_CRUMB, { text: 'Dashboard', href: ROUTES.dashboard }],
   [ROUTES.hostedZones]: [ROOT_CRUMB, ZONES_CRUMB],
   [ROUTES.createHostedZone]: [
     ROOT_CRUMB,
     ZONES_CRUMB,
     { text: 'Create hosted zone', href: ROUTES.createHostedZone },
   ],
+  [ROUTES.trafficPolicies]: [
+    ROOT_CRUMB,
+    { text: 'Traffic policies', href: ROUTES.trafficPolicies },
+  ],
+  [ROUTES.healthChecks]: [
+    ROOT_CRUMB,
+    { text: 'Health checks', href: ROUTES.healthChecks },
+  ],
+  [ROUTES.resolver]: [ROOT_CRUMB, { text: 'Resolver', href: ROUTES.resolver }],
+  [ROUTES.profiles]: [ROOT_CRUMB, { text: 'Profiles', href: ROUTES.profiles }],
 };
 
 const ZONE_PATH = /^\/route53\/hosted-zones\/([^/]+)$/;

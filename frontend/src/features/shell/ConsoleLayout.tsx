@@ -18,6 +18,7 @@ import { displayZoneName } from '@/features/hosted-zones/format';
 import { ApiError } from '@/lib/api/errors';
 import type { User } from '@/lib/api/types';
 import { FlashMessages, FlashProvider } from './flash';
+import { ConsoleHelp, HelpContextProvider } from './help';
 import {
   NAV_HEADER,
   NAV_ITEMS,
@@ -25,6 +26,7 @@ import {
   breadcrumbsFor,
   zoneIdFromPath,
 } from './navigation';
+import { PreferencesScope } from './TablePreferences';
 
 type FollowEvent = CustomEvent<{ href?: string; external?: boolean }>;
 
@@ -80,6 +82,7 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
   const pathname = usePathname();
   const signOut = useSignOut();
   const [navigationOpen, setNavigationOpen] = useState(true);
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   const followInternal = (event: FollowEvent) => {
     const { href, external } = event.detail;
@@ -93,61 +96,73 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
   const zoneName = zone.data ? displayZoneName(zone.data.name) : undefined;
 
   return (
-    <FlashProvider>
-      <div id="top-nav">
-        <TopNavigation
-          identity={{
-            href: ROUTES.home,
-            title: 'Route 53 Console',
-            onFollow: (event) => {
-              event.preventDefault();
-              router.push(ROUTES.home);
-            },
-          }}
-          utilities={[
-            {
-              type: 'menu-dropdown',
-              text: user.email,
-              description: user.is_demo
-                ? `Demo account · ${accountId}`
-                : `Account ID: ${accountId}`,
-              iconName: 'user-profile',
-              items: [{ id: 'sign-out', text: 'Sign out' }],
-              onItemClick: ({ detail }) => {
-                if (detail.id !== 'sign-out') return;
-                signOut.mutate(undefined, {
-                  onSettled: () => router.replace(SIGN_IN_PATH),
-                });
-              },
-            },
-          ]}
-        />
-      </div>
-      <AppLayout
-        headerSelector="#top-nav"
-        contentType={contentTypeFor(pathname)}
-        toolsHide
-        notifications={<FlashMessages />}
-        navigationOpen={navigationOpen}
-        onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
-        navigation={
-          <SideNavigation
-            header={NAV_HEADER}
-            items={NAV_ITEMS}
-            activeHref={pathname}
-            onFollow={followInternal}
+    <PreferencesScope accountId={user.account_id}>
+      <FlashProvider>
+        <HelpContextProvider value={() => setToolsOpen(true)}>
+          <div id="top-nav">
+            <TopNavigation
+              identity={{
+                href: ROUTES.home,
+                title: 'Route 53 Console',
+                onFollow: (event) => {
+                  event.preventDefault();
+                  router.push(ROUTES.home);
+                },
+              }}
+              utilities={[
+                {
+                  type: 'button',
+                  text: 'Help',
+                  iconName: 'status-info',
+                  onClick: () => setToolsOpen(true),
+                },
+                {
+                  type: 'menu-dropdown',
+                  text: user.email,
+                  description: user.is_demo
+                    ? `Demo account · ${accountId}`
+                    : `Account ID: ${accountId}`,
+                  iconName: 'user-profile',
+                  items: [{ id: 'sign-out', text: 'Sign out' }],
+                  onItemClick: ({ detail }) => {
+                    if (detail.id !== 'sign-out') return;
+                    signOut.mutate(undefined, {
+                      onSettled: () => router.replace(SIGN_IN_PATH),
+                    });
+                  },
+                },
+              ]}
+            />
+          </div>
+          <AppLayout
+            headerSelector="#top-nav"
+            contentType={contentTypeFor(pathname)}
+            notifications={<FlashMessages />}
+            navigationOpen={navigationOpen}
+            onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
+            navigation={
+              <SideNavigation
+                header={NAV_HEADER}
+                items={NAV_ITEMS}
+                activeHref={pathname}
+                onFollow={followInternal}
+              />
+            }
+            breadcrumbs={
+              <BreadcrumbGroup
+                items={breadcrumbsFor(pathname, zoneName)}
+                ariaLabel="Breadcrumbs"
+                onFollow={followInternal}
+              />
+            }
+            tools={<ConsoleHelp pathname={pathname} />}
+            toolsOpen={toolsOpen}
+            onToolsChange={({ detail }) => setToolsOpen(detail.open)}
+            content={children}
           />
-        }
-        breadcrumbs={
-          <BreadcrumbGroup
-            items={breadcrumbsFor(pathname, zoneName)}
-            ariaLabel="Breadcrumbs"
-            onFollow={followInternal}
-          />
-        }
-        content={children}
-      />
-    </FlashProvider>
+        </HelpContextProvider>
+      </FlashProvider>
+    </PreferencesScope>
   );
 }
 
