@@ -2,7 +2,7 @@
 #
 # Production runs on Vercel, which builds from source, so this image only needs
 # a development target: `next dev` with the source bind-mounted in.
-FROM node:24-bookworm-slim AS base
+FROM node:25-bookworm-slim AS base
 
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm install --global pnpm@12.10.1
