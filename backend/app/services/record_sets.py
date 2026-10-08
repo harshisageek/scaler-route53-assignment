@@ -27,6 +27,7 @@ def list_record_sets(
         zone.id,
         q=params.q,
         record_type=params.record_type,
+        routing_policy=params.routing_policy,
         sort=params.sort,
         offset=(params.page - 1) * params.page_size,
         limit=params.page_size,
@@ -50,14 +51,34 @@ def create_record_set(
     zone = _owned_zone(db, owner, zone_id)
     name = _record_name(request.name, zone.name)
     values = _record_values(request.type, request.values)
+    set_identifier = request.set_identifier or ""
     _ensure_cname_compatible(db, zone, name, request.type)
-    _ensure_available(db, zone.id, name, request.type)
+    _ensure_policy_compatible(
+        db,
+        zone.id,
+        name,
+        request.type,
+        request.routing_policy,
+    )
+    _ensure_available(
+        db,
+        zone.id,
+        name,
+        request.type,
+        set_identifier,
+    )
     record = RecordSet(
         hosted_zone_id=zone.id,
         name=name,
         type=request.type,
         ttl=request.ttl,
         values=values,
+        routing_policy=request.routing_policy,
+        set_identifier=set_identifier,
+        weight=request.weight,
+        failover_role=request.failover_role,
+        region=request.region,
+        geolocation=request.geolocation,
     )
     db.add(record)
     db.commit()
@@ -77,12 +98,34 @@ def update_record_set(
     _protect_default_record(zone, record)
     name = _record_name(request.name, zone.name)
     values = _record_values(request.type, request.values)
+    set_identifier = request.set_identifier or ""
     _ensure_cname_compatible(db, zone, name, request.type, exclude_id=record.id)
-    _ensure_available(db, zone.id, name, request.type, exclude_id=record.id)
+    _ensure_policy_compatible(
+        db,
+        zone.id,
+        name,
+        request.type,
+        request.routing_policy,
+        exclude_id=record.id,
+    )
+    _ensure_available(
+        db,
+        zone.id,
+        name,
+        request.type,
+        set_identifier,
+        exclude_id=record.id,
+    )
     record.name = name
     record.type = request.type
     record.ttl = request.ttl
     record.values = values
+    record.routing_policy = request.routing_policy
+    record.set_identifier = set_identifier
+    record.weight = request.weight
+    record.failover_role = request.failover_role
+    record.region = request.region
+    record.geolocation = request.geolocation
     db.commit()
     db.refresh(record)
     return RecordSetOut.model_validate(record)
@@ -163,7 +206,7 @@ def _ensure_cname_compatible(
         name,
         exclude_id=exclude_id,
     )
-    if (record_type == "CNAME" and existing_types) or (
+    if (record_type == "CNAME" and existing_types - {"CNAME"}) or (
         record_type != "CNAME" and "CNAME" in existing_types
     ):
         raise ConflictError(
@@ -187,6 +230,7 @@ def _ensure_available(
     zone_id: str,
     name: str,
     record_type: str,
+    set_identifier: str,
     *,
     exclude_id: int | None = None,
 ) -> None:
@@ -195,10 +239,67 @@ def _ensure_available(
         zone_id,
         name,
         record_type,
+        set_identifier,
         exclude_id=exclude_id,
     ):
         raise ConflictError(
-            f"A {record_type} record set already exists for {name}",
-            {"name": name, "type": record_type},
+            f"A {record_type} record set with this identifier already exists for {name}",
+            {
+                "name": name,
+                "type": record_type,
+                "set_identifier": set_identifier or None,
+            },
             code="RecordSetAlreadyExists",
+        )
+
+
+def _ensure_policy_compatible(
+    db: Session,
+    zone_id: str,
+    name: str,
+    record_type: str,
+    routing_policy: str,
+    *,
+    exclude_id: int | None = None,
+) -> None:
+    existing = record_sets.policies_for_name_and_type(
+        db,
+        zone_id,
+        name,
+        record_type,
+        exclude_id=exclude_id,
+    )
+    if not existing:
+        return
+    if routing_policy == "simple":
+        if existing == {"simple"}:
+            return
+        raise ConflictError(
+            "A simple record cannot share its name and type with another routing policy.",
+            {
+                "name": name,
+                "type": record_type,
+                "existing_policies": sorted(existing),
+            },
+            code="RoutingPolicyConflict",
+        )
+    if "simple" in existing:
+        raise ConflictError(
+            "A simple record cannot share its name and type with another routing policy.",
+            {
+                "name": name,
+                "type": record_type,
+                "existing_policies": sorted(existing),
+            },
+            code="RoutingPolicyConflict",
+        )
+    if existing != {routing_policy}:
+        raise ConflictError(
+            "Record sets with the same name and type must use one routing policy.",
+            {
+                "name": name,
+                "type": record_type,
+                "existing_policies": sorted(existing),
+            },
+            code="RoutingPolicyConflict",
         )

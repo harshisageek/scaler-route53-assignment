@@ -29,6 +29,8 @@ export type RecordSetListParams = NonNullable<
 export type RecordSetSort = NonNullable<RecordSetListParams['sort']>;
 export type RecordType = RecordSet['type'];
 export type EditableRecordType = RecordSetCreate['type'];
+export type RoutingPolicy = RecordSet['routing_policy'];
+export type FailoverRole = NonNullable<RecordSet['failover_role']>;
 
 export type User = Schemas['UserOut'];
 export type SignInRequest = Schemas['SignInRequest'];

@@ -9,7 +9,7 @@ test('the console navigation, help panel and coming-soon pages work together', a
   await expect(page.getByRole('link', { name: 'Hosted zones' }).first()).toBeVisible();
   await page.getByRole('button', { name: 'Help' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Hosted zones', exact: true }),
+    page.getByRole('heading', { name: 'Hosted zones', exact: true, level: 2 }),
   ).toBeVisible();
 
   await page.getByRole('link', { name: 'Traffic policies' }).click();
