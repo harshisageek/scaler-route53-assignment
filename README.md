@@ -55,6 +55,40 @@ cd frontend && cp .env.example .env.local && pnpm dev
 | `make check`        | format check, lint, typecheck and tests         |
 | `make api-types`    | regenerate the frontend's API types from the backend's OpenAPI schema |
 
+## Deployment
+
+| Part     | Host                       | Config                                    |
+| -------- | -------------------------- | ----------------------------------------- |
+| Frontend | Vercel                     | root directory `frontend`                 |
+| Backend  | Render (free, Docker)      | [`render.yaml`](render.yaml) Blueprint    |
+| Database | SQLite, backed up by Litestream to Supabase Storage | [`backend/litestream.yml`](backend/litestream.yml) |
+
+The browser only talks to Vercel. Next.js forwards `/api/*` to Render, so the
+session cookie stays first-party and production needs no CORS.
+
+Render's free disk is wiped on every restart. At boot, the container restores
+the SQLite file from Supabase Storage, applies migrations, then runs the API
+under Litestream, which streams every write back to storage.
+
+**Backend (Render):** create a Blueprint from this repository, then enter the
+five `LITESTREAM_*` values from Supabase (Storage, then S3 connection) when
+Render asks for them.
+
+**Frontend (Vercel):** import the repository with root directory `frontend`,
+and set:
+
+| Variable                       | Value                                         |
+| ------------------------------ | --------------------------------------------- |
+| `BACKEND_URL`                  | the Render URL, e.g. `https://route53-clone-api.onrender.com` |
+| `NEXT_PUBLIC_APP_ENV`          | `production`                                  |
+| `ENABLE_EXPERIMENTAL_COREPACK` | `1`, so Vercel uses the pnpm version pinned in `package.json` |
+
+`BACKEND_URL` is read when Next.js builds, so redeploy after changing it.
+
+**Keep-awake:** Render's free tier sleeps after 15 idle minutes. Set the GitHub
+repository variable `HEALTHCHECK_URL` to the API's `/api/v1/health` URL and
+[`keep-awake.yml`](.github/workflows/keep-awake.yml) pings it every 10 minutes.
+
 ## Project layout
 
 ```text

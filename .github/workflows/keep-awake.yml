@@ -1,0 +1,29 @@
+name: Keep awake
+
+# Render's free tier sleeps after 15 idle minutes, and the first request after
+# that waits for a cold start. A ping every 10 minutes keeps the API warm.
+#
+# Set the repository variable HEALTHCHECK_URL (Settings > Secrets and variables >
+# Actions > Variables) to the API's health URL, for example
+# https://route53-clone-api.onrender.com/api/v1/health. Until it is set, the job
+# is skipped rather than failing.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    name: Ping health endpoint
+    if: vars.HEALTHCHECK_URL != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping
+        env:
+          HEALTHCHECK_URL: ${{ vars.HEALTHCHECK_URL }}
+        # A cold start can take close to a minute, hence the long timeout and retries.
+        run: curl --fail --silent --show-error --max-time 90 --retry 3 --retry-delay 15 "$HEALTHCHECK_URL"

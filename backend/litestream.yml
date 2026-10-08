@@ -1,16 +1,22 @@
 # Litestream replicates the SQLite file to S3-compatible object storage.
 #
-# Litestream auto-detects Supabase Storage from the endpoint hostname and
-# applies the right signing and path style, so no provider flags are needed.
+# Litestream detects Supabase Storage from the endpoint hostname and switches on
+# path-style URLs and signed payloads, so no provider flags are needed.
+#
+# Litestream ignores unknown keys rather than rejecting them, so keep this in
+# the v0.5 format: snapshot settings are global, and each database has one
+# `replica`.
+snapshot:
+  interval: 1h
+  retention: 72h
+
 dbs:
   - path: /data/route53.db
-    replicas:
-      - type: s3
-        endpoint: ${LITESTREAM_S3_ENDPOINT}
-        bucket: ${LITESTREAM_S3_BUCKET}
-        region: ${LITESTREAM_S3_REGION}
-        path: route53
-        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
-        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
-        retention: 72h
-        snapshot-interval: 1h
+    replica:
+      type: s3
+      endpoint: ${LITESTREAM_S3_ENDPOINT}
+      bucket: ${LITESTREAM_S3_BUCKET}
+      region: ${LITESTREAM_S3_REGION}
+      path: route53
+      access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+      secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}

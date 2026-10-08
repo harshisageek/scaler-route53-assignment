@@ -1,0 +1,36 @@
+# Render Blueprint for the backend API.
+#
+# Render builds backend/Dockerfile's last stage (production), which restores the
+# SQLite file from Supabase Storage at boot and streams every write back.
+# Values marked `sync: false` are secrets: Render asks for them in its dashboard,
+# and they never live in this repository.
+services:
+  - type: web
+    name: route53-clone-api
+    runtime: docker
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health
+    # Deploy only after CI passes on main.
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: SEED_DEMO_DATA
+        value: "true"
+      - key: LITESTREAM_S3_ENDPOINT
+        sync: false
+      - key: LITESTREAM_S3_BUCKET
+        sync: false
+      - key: LITESTREAM_S3_REGION
+        sync: false
+      - key: LITESTREAM_ACCESS_KEY_ID
+        sync: false
+      - key: LITESTREAM_SECRET_ACCESS_KEY
+        sync: false
