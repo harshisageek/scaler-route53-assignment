@@ -26,6 +26,7 @@ export function useRecordSets(zoneId: string, params: RecordSetListParams) {
         searchParams: {
           q: params.q ?? undefined,
           type: params.type ?? undefined,
+          routing_policy: params.routing_policy ?? undefined,
           sort: params.sort,
           page: params.page,
           page_size: params.page_size,

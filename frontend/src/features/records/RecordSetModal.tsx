@@ -10,17 +10,34 @@ import Select, { type SelectProps } from '@cloudscape-design/components/select';
 import SpaceBetween from '@cloudscape-design/components/space-between';
 import Textarea from '@cloudscape-design/components/textarea';
 import { useState } from 'react';
+import { AWS_REGIONS } from '@/features/hosted-zones/regions';
 import { useFlash } from '@/features/shell/flash';
 import { fieldErrorsFrom } from '@/lib/api/fieldErrors';
-import type { EditableRecordType, RecordSet } from '@/lib/api/types';
+import type {
+  EditableRecordType,
+  FailoverRole,
+  RecordSet,
+  RoutingPolicy,
+} from '@/lib/api/types';
 import { useCreateRecordSet, useUpdateRecordSet } from './api';
 import { EDITABLE_RECORD_TYPES, RECORD_TYPE_HINTS } from './recordTypes';
+import {
+  FAILOVER_OPTIONS,
+  GEOLOCATION_OPTIONS,
+  ROUTING_POLICY_DESCRIPTIONS,
+  ROUTING_POLICY_OPTIONS,
+} from './routingPolicies';
 
 const TTL_MAX = 2_147_483_647;
 const TYPE_OPTIONS: SelectProps.Option[] = EDITABLE_RECORD_TYPES.map((type) => ({
   value: type,
   label: type,
   description: RECORD_TYPE_HINTS[type],
+}));
+const REGION_OPTIONS: SelectProps.Option[] = AWS_REGIONS.map((region) => ({
+  value: region.code,
+  label: region.name,
+  description: region.code,
 }));
 
 interface Props {
@@ -42,6 +59,16 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
   );
   const [ttl, setTtl] = useState(String(record?.ttl ?? 300));
   const [values, setValues] = useState(record?.values.join('\n') ?? '');
+  const [routingPolicy, setRoutingPolicy] = useState<RoutingPolicy>(
+    record?.routing_policy ?? 'simple',
+  );
+  const [setIdentifier, setSetIdentifier] = useState(record?.set_identifier ?? '');
+  const [weight, setWeight] = useState(String(record?.weight ?? 0));
+  const [failoverRole, setFailoverRole] = useState<FailoverRole | null>(
+    record?.failover_role ?? null,
+  );
+  const [region, setRegion] = useState(record?.region ?? '');
+  const [geolocation, setGeolocation] = useState(record?.geolocation ?? '');
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const fieldErrors = fieldErrorsFrom(mutation.error);
 
@@ -64,11 +91,47 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
     if (type === 'CNAME' && (!name.trim() || name.trim() === '@')) {
       errors.name = 'A CNAME record cannot be created at the zone apex.';
     }
+    const requiresIdentifier = [
+      'weighted',
+      'failover',
+      'latency',
+      'geolocation',
+    ].includes(routingPolicy);
+    if (requiresIdentifier && !setIdentifier.trim()) {
+      errors.set_identifier = 'Enter a set identifier.';
+    }
+    const parsedWeight = Number(weight);
+    if (
+      routingPolicy === 'weighted' &&
+      (!Number.isInteger(parsedWeight) || parsedWeight < 0 || parsedWeight > 255)
+    ) {
+      errors.weight = 'Enter a whole number from 0 to 255.';
+    }
+    if (routingPolicy === 'failover' && !failoverRole) {
+      errors.failover_role = 'Choose Primary or Secondary.';
+    }
+    if (routingPolicy === 'latency' && !region) {
+      errors.region = 'Choose an AWS Region.';
+    }
+    if (routingPolicy === 'geolocation' && !geolocation) {
+      errors.geolocation = 'Choose a location.';
+    }
     setClientErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     mutation.mutate(
-      { name, type, ttl: parsedTtl, values: parsedValues },
+      {
+        name,
+        type,
+        ttl: parsedTtl,
+        values: parsedValues,
+        routing_policy: routingPolicy,
+        set_identifier: requiresIdentifier ? setIdentifier.trim() : null,
+        weight: routingPolicy === 'weighted' ? parsedWeight : null,
+        failover_role: routingPolicy === 'failover' ? failoverRole : null,
+        region: routingPolicy === 'latency' ? region : null,
+        geolocation: routingPolicy === 'geolocation' ? geolocation : null,
+      },
       {
         onSuccess: (saved) => {
           notify({
@@ -127,6 +190,112 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
             }
           />
         </FormField>
+        <FormField
+          label="Routing policy"
+          description={ROUTING_POLICY_DESCRIPTIONS[routingPolicy]}
+          errorText={fieldErrors.routing_policy}
+        >
+          <Select
+            selectedOption={
+              ROUTING_POLICY_OPTIONS.find((option) => option.value === routingPolicy) ??
+              null
+            }
+            options={ROUTING_POLICY_OPTIONS}
+            onChange={({ detail }) => {
+              setRoutingPolicy(detail.selectedOption.value as RoutingPolicy);
+              setClientErrors({});
+            }}
+          />
+        </FormField>
+        {['weighted', 'failover', 'latency', 'geolocation'].includes(routingPolicy) && (
+          <FormField
+            label="Set identifier"
+            description="A unique label for this answer, such as blue or primary."
+            errorText={clientErrors.set_identifier ?? fieldErrors.set_identifier}
+          >
+            <Input
+              value={setIdentifier}
+              placeholder="blue"
+              onChange={({ detail }) => {
+                setSetIdentifier(detail.value);
+                setClientErrors((current) => ({
+                  ...current,
+                  set_identifier: '',
+                }));
+              }}
+            />
+          </FormField>
+        )}
+        {routingPolicy === 'weighted' && (
+          <FormField
+            label="Weight"
+            description="A relative share from 0 to 255."
+            errorText={clientErrors.weight ?? fieldErrors.weight}
+          >
+            <Input
+              value={weight}
+              type="number"
+              inputMode="numeric"
+              onChange={({ detail }) => {
+                setWeight(detail.value);
+                setClientErrors((current) => ({ ...current, weight: '' }));
+              }}
+            />
+          </FormField>
+        )}
+        {routingPolicy === 'failover' && (
+          <FormField
+            label="Failover record type"
+            errorText={clientErrors.failover_role ?? fieldErrors.failover_role}
+          >
+            <Select
+              selectedOption={
+                FAILOVER_OPTIONS.find((option) => option.value === failoverRole) ?? null
+              }
+              options={FAILOVER_OPTIONS}
+              placeholder="Choose a failover role"
+              onChange={({ detail }) => {
+                setFailoverRole(detail.selectedOption.value as FailoverRole);
+                setClientErrors((current) => ({ ...current, failover_role: '' }));
+              }}
+            />
+          </FormField>
+        )}
+        {routingPolicy === 'latency' && (
+          <FormField label="Region" errorText={clientErrors.region ?? fieldErrors.region}>
+            <Select
+              selectedOption={
+                REGION_OPTIONS.find((option) => option.value === region) ?? null
+              }
+              options={REGION_OPTIONS}
+              placeholder="Choose an AWS Region"
+              filteringType="auto"
+              onChange={({ detail }) => {
+                setRegion(detail.selectedOption.value ?? '');
+                setClientErrors((current) => ({ ...current, region: '' }));
+              }}
+            />
+          </FormField>
+        )}
+        {routingPolicy === 'geolocation' && (
+          <FormField
+            label="Location"
+            errorText={clientErrors.geolocation ?? fieldErrors.geolocation}
+          >
+            <Select
+              selectedOption={
+                GEOLOCATION_OPTIONS.find((option) => option.value === geolocation) ?? null
+              }
+              options={GEOLOCATION_OPTIONS}
+              placeholder="Choose a location"
+              filteringType="auto"
+              onChange={({ detail }) => {
+                setGeolocation(detail.selectedOption.value ?? '');
+                setClientErrors((current) => ({ ...current, geolocation: '' }));
+              }}
+            />
+          </FormField>
+        )}
         <FormField
           label="Value"
           description={`${RECORD_TYPE_HINTS[type]}. Enter multiple values on separate lines.`}

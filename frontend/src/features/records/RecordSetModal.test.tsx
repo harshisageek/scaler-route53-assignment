@@ -17,9 +17,23 @@ const RECORD: RecordSet = {
   type: 'A',
   ttl: 300,
   values: ['192.0.2.1'],
+  routing_policy: 'simple',
+  set_identifier: null,
+  weight: null,
+  failover_role: null,
+  region: null,
+  geolocation: null,
   created_at: '2026-10-08T12:00:00Z',
   updated_at: '2026-10-08T12:00:00Z',
 };
+const SIMPLE_ROUTING = {
+  routing_policy: 'simple',
+  set_identifier: null,
+  weight: null,
+  failover_role: null,
+  region: null,
+  geolocation: null,
+} as const;
 
 function jsonResponse(status: number, body?: unknown): Response {
   return { ok: status < 400, status, json: async () => body } as Response;
@@ -72,8 +86,53 @@ describe('RecordSetModal', () => {
           type: 'A',
           ttl: 300,
           values: ['192.0.2.1', '192.0.2.2'],
+          ...SIMPLE_ROUTING,
         }),
       }),
+    );
+  });
+
+  it('collects the fields for a weighted routing policy', async () => {
+    const saved: RecordSet = {
+      ...RECORD,
+      routing_policy: 'weighted',
+      set_identifier: 'blue',
+      weight: 25,
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(201, saved));
+    vi.stubGlobal('fetch', fetchMock);
+    renderModal(
+      <RecordSetModal zoneId="Z1" zoneName="example.com" onDismiss={vi.fn()} />,
+    );
+
+    await userEvent.type(screen.getByLabelText('Record name'), 'www');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Value' }), '192.0.2.1');
+    await userEvent.click(screen.getByRole('button', { name: /Simple routing/ }));
+    await userEvent.click(screen.getByRole('option', { name: /Weighted/ }));
+    await userEvent.type(screen.getByLabelText('Set identifier'), 'blue');
+    const weight = screen.getByLabelText('Weight');
+    await userEvent.clear(weight);
+    await userEvent.type(weight, '25');
+    await userEvent.click(screen.getByRole('button', { name: 'Create record' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/hosted-zones/Z1/records',
+        expect.objectContaining({
+          body: JSON.stringify({
+            name: 'www',
+            type: 'A',
+            ttl: 300,
+            values: ['192.0.2.1'],
+            routing_policy: 'weighted',
+            set_identifier: 'blue',
+            weight: 25,
+            failover_role: null,
+            region: null,
+            geolocation: null,
+          }),
+        }),
+      ),
     );
   });
 
@@ -109,6 +168,7 @@ describe('RecordSetModal', () => {
             type: 'A',
             ttl: 60,
             values: ['192.0.2.9'],
+            ...SIMPLE_ROUTING,
           }),
         }),
       ),

@@ -109,3 +109,45 @@ test('default records are protected and CNAME mistakes stay in the form', async 
     dialog.getByText('A CNAME record must have exactly one value.'),
   ).toBeVisible();
 });
+
+test('weighted and failover routing policies are stored and displayed', async ({
+  page,
+}) => {
+  await signUp(page, uniqueEmail());
+  const created = await page.request.post('/api/v1/hosted-zones', {
+    data: { name: 'routing.example.com' },
+  });
+  const zone = (await created.json()) as { id: string };
+  await page.goto(`/route53/hosted-zones/${zone.id}`);
+
+  await page.getByRole('button', { name: 'Create record' }).click();
+  let dialog = page.getByRole('dialog', { name: 'Create record' });
+  await dialog.getByLabel('Record name').fill('api');
+  await dialog.getByRole('textbox', { name: 'Value' }).fill('192.0.2.10');
+  await dialog.getByRole('button', { name: /Simple routing/ }).click();
+  await page.getByRole('option', { name: /Weighted/ }).click();
+  await dialog.getByLabel('Set identifier').fill('blue');
+  await dialog.getByRole('spinbutton', { name: 'Weight' }).fill('25');
+  await dialog.getByRole('button', { name: 'Create record' }).click();
+
+  await expect(
+    page.getByRole('row', { name: /api\.routing\.example\.com.*Weighted \(25\).*blue/ }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Create record' }).click();
+  dialog = page.getByRole('dialog', { name: 'Create record' });
+  await dialog.getByLabel('Record name').fill('failover');
+  await dialog.getByRole('textbox', { name: 'Value' }).fill('192.0.2.20');
+  await dialog.getByRole('button', { name: /Simple routing/ }).click();
+  await page.getByRole('option', { name: /Failover/ }).click();
+  await dialog.getByLabel('Set identifier').fill('primary');
+  await dialog.getByRole('button', { name: /Choose a failover role/ }).click();
+  await page.getByRole('option', { name: 'Primary' }).click();
+  await dialog.getByRole('button', { name: 'Create record' }).click();
+
+  await expect(
+    page.getByRole('row', {
+      name: /failover\.routing\.example\.com.*Failover \(primary\).*primary/,
+    }),
+  ).toBeVisible();
+});

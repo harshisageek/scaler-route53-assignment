@@ -46,6 +46,7 @@ def search_record_sets(
     *,
     q: str | None,
     record_type: str | None,
+    routing_policy: str | None,
     sort: str,
     offset: int,
     limit: int,
@@ -61,6 +62,8 @@ def search_record_sets(
         )
     if record_type:
         filters.append(RecordSet.type == record_type)
+    if routing_policy:
+        filters.append(RecordSet.routing_policy == routing_policy)
 
     total = db.scalar(select(func.count()).select_from(RecordSet).where(*filters)) or 0
     columns = {"name": RecordSet.name, "type": RecordSet.type, "ttl": RecordSet.ttl}
@@ -94,6 +97,7 @@ def exists_by_name_and_type(
     zone_id: str,
     name: str,
     record_type: str,
+    set_identifier: str,
     *,
     exclude_id: int | None = None,
 ) -> bool:
@@ -101,10 +105,29 @@ def exists_by_name_and_type(
         RecordSet.hosted_zone_id == zone_id,
         RecordSet.name == name,
         RecordSet.type == record_type,
+        RecordSet.set_identifier == set_identifier,
     ]
     if exclude_id is not None:
         filters.append(RecordSet.id != exclude_id)
     return db.scalar(select(RecordSet.id).where(*filters).limit(1)) is not None
+
+
+def policies_for_name_and_type(
+    db: Session,
+    zone_id: str,
+    name: str,
+    record_type: str,
+    *,
+    exclude_id: int | None = None,
+) -> set[str]:
+    filters = [
+        RecordSet.hosted_zone_id == zone_id,
+        RecordSet.name == name,
+        RecordSet.type == record_type,
+    ]
+    if exclude_id is not None:
+        filters.append(RecordSet.id != exclude_id)
+    return set(db.scalars(select(RecordSet.routing_policy).where(*filters)).all())
 
 
 def types_for_name(

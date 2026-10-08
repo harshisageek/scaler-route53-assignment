@@ -25,15 +25,37 @@ class RecordSet(TimestampMixin, Base):
     type: Mapped[str] = mapped_column(String(10), nullable=False)
     ttl: Mapped[int | None] = mapped_column(Integer)
     values: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    routing_policy: Mapped[str] = mapped_column(String(16), nullable=False, default="simple")
+    # Empty for simple and multivalue records. Other routing policies require
+    # a stable identifier so multiple answers can share one name and type.
+    set_identifier: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    weight: Mapped[int | None] = mapped_column(Integer)
+    failover_role: Mapped[str | None] = mapped_column(String(9))
+    region: Mapped[str | None] = mapped_column(String(32))
+    geolocation: Mapped[str | None] = mapped_column(String(64))
 
     __table_args__ = (
         CheckConstraint("name = lower(name) AND name LIKE '%.'", name="name_is_canonical"),
         CheckConstraint(f"ttl IS NULL OR (ttl >= 0 AND ttl <= {TTL_MAX})", name="ttl_range"),
+        CheckConstraint(
+            "routing_policy IN "
+            "('simple', 'weighted', 'failover', 'latency', 'geolocation', 'multivalue')",
+            name="routing_policy_value",
+        ),
+        CheckConstraint(
+            "weight IS NULL OR (weight >= 0 AND weight <= 255)",
+            name="weight_range",
+        ),
+        CheckConstraint(
+            "failover_role IS NULL OR failover_role IN ('PRIMARY', 'SECONDARY')",
+            name="failover_role_value",
+        ),
         Index(
-            "ix_record_sets_hosted_zone_id_name_type",
+            "ix_record_sets_hosted_zone_name_type_identifier",
             "hosted_zone_id",
             "name",
             "type",
+            "set_identifier",
             unique=True,
         ),
     )

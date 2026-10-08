@@ -382,6 +382,22 @@ export interface components {
             ttl: number;
             /** Values */
             values: string[];
+            /**
+             * Routing Policy
+             * @default simple
+             * @enum {string}
+             */
+            routing_policy: "simple" | "weighted" | "failover" | "latency" | "geolocation" | "multivalue";
+            /** Set Identifier */
+            set_identifier?: string | null;
+            /** Weight */
+            weight?: number | null;
+            /** Failover Role */
+            failover_role?: ("PRIMARY" | "SECONDARY") | null;
+            /** Region */
+            region?: string | null;
+            /** Geolocation */
+            geolocation?: string | null;
         };
         /** RecordSetList */
         RecordSetList: {
@@ -409,6 +425,21 @@ export interface components {
             ttl: number;
             /** Values */
             values: string[];
+            /**
+             * Routing Policy
+             * @enum {string}
+             */
+            routing_policy: "simple" | "weighted" | "failover" | "latency" | "geolocation" | "multivalue";
+            /** Set Identifier */
+            set_identifier: string | null;
+            /** Weight */
+            weight: number | null;
+            /** Failover Role */
+            failover_role: ("PRIMARY" | "SECONDARY") | null;
+            /** Region */
+            region: string | null;
+            /** Geolocation */
+            geolocation: string | null;
             /**
              * Created At
              * Format: date-time
@@ -440,6 +471,22 @@ export interface components {
             ttl: number;
             /** Values */
             values: string[];
+            /**
+             * Routing Policy
+             * @default simple
+             * @enum {string}
+             */
+            routing_policy: "simple" | "weighted" | "failover" | "latency" | "geolocation" | "multivalue";
+            /** Set Identifier */
+            set_identifier?: string | null;
+            /** Weight */
+            weight?: number | null;
+            /** Failover Role */
+            failover_role?: ("PRIMARY" | "SECONDARY") | null;
+            /** Region */
+            region?: string | null;
+            /** Geolocation */
+            geolocation?: string | null;
         };
         /** SignInRequest */
         SignInRequest: {
@@ -846,6 +893,7 @@ export interface operations {
                 /** @description Case-insensitive text to find in the record name or value. */
                 q?: string | null;
                 type?: ("A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA" | "SOA") | null;
+                routing_policy?: ("simple" | "weighted" | "failover" | "latency" | "geolocation" | "multivalue") | null;
                 sort?: "name" | "-name" | "type" | "-type" | "ttl" | "-ttl";
                 page?: number;
                 page_size?: number;
