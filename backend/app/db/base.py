@@ -1,9 +1,11 @@
 """Declarative base shared by every model."""
 
 from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy import DateTime, MetaData
+from sqlalchemy import DateTime, Dialect, MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
 # Explicit constraint names let Alembic generate reversible migrations on SQLite,
 # which otherwise cannot ALTER an unnamed constraint.
@@ -20,14 +22,36 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+class UTCDateTime(TypeDecorator[datetime]):
+    """A datetime that is always UTC-aware in Python.
+
+    SQLite has no timezone storage, so values come back naive. Without this the
+    API would emit timestamps with no offset, which browsers read as local time.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, _dialect: Dialect) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError("naive datetimes are ambiguous; pass a UTC-aware value")
+        return value.astimezone(UTC)
+
+    def process_result_value(self, value: Any, _dialect: Dialect) -> datetime | None:
+        if value is None:
+            return None
+        stored: datetime = value
+        return stored.replace(tzinfo=UTC) if stored.tzinfo is None else stored.astimezone(UTC)
+
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+        UTCDateTime, default=utcnow, onupdate=utcnow, nullable=False
     )
