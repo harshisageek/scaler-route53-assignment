@@ -18,6 +18,17 @@ export type HostedZoneListParams = NonNullable<
 export type HostedZoneSort = NonNullable<HostedZoneListParams['sort']>;
 export type HostedZoneList = Schemas['HostedZoneList'];
 
+export type RecordSet = Schemas['RecordSetOut'];
+export type RecordSetCreate = Schemas['RecordSetCreate'];
+export type RecordSetUpdate = Schemas['RecordSetUpdate'];
+export type RecordSetList = Schemas['RecordSetList'];
+export type RecordSetListParams = NonNullable<
+  operations['list_record_sets_api_v1_hosted_zones__zone_id__records_get']['parameters']['query']
+>;
+export type RecordSetSort = NonNullable<RecordSetListParams['sort']>;
+export type RecordType = RecordSet['type'];
+export type EditableRecordType = RecordSetCreate['type'];
+
 export type User = Schemas['UserOut'];
 export type SignInRequest = Schemas['SignInRequest'];
 export type SignUpRequest = Schemas['SignUpRequest'];

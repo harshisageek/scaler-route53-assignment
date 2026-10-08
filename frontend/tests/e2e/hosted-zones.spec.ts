@@ -17,7 +17,11 @@ test('creating a public zone opens it with its name servers', async ({ page }) =
   await expect(
     page.getByRole('heading', { name: 'shop.example.com', level: 1 }),
   ).toBeVisible();
-  await expect(page.getByText(/^ns-\d+\.awsdns-\d+\.com\.$/)).toBeVisible();
+  await expect(
+    page
+      .getByRole('group', { name: 'Hosted zone details' })
+      .getByText(/^ns-\d+\.awsdns-\d+\.com\.$/),
+  ).toBeVisible();
 
   await page.getByRole('link', { name: 'Hosted zones' }).first().click();
   await expect(page.getByRole('rowheader', { name: 'shop.example.com' })).toBeVisible();
@@ -64,7 +68,7 @@ test('a zone description can be edited and an empty zone can be deleted', async 
   const zone = (await created.json()) as { id: string };
   await page.goto(`/route53/hosted-zones/${zone.id}`);
 
-  await page.getByRole('button', { name: 'Edit' }).click();
+  await page.getByRole('button', { name: 'Edit' }).first().click();
   const editDialog = page.getByRole('dialog', { name: 'Edit hosted zone' });
   await editDialog.getByRole('textbox', { name: /Description/ }).fill('New description');
   await editDialog.getByRole('button', { name: 'Save changes' }).click();
@@ -73,7 +77,7 @@ test('a zone description can be edited and an empty zone can be deleted', async 
   ).toBeVisible();
   await expect(page.getByText('New description').first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('button', { name: 'Delete' }).first().click();
   const deleteDialog = page.getByRole('dialog', { name: 'Delete hosted zone' });
   await expect(
     deleteDialog.getByText('Deleting a hosted zone cannot be undone.'),

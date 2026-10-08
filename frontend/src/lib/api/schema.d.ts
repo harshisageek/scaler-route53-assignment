@@ -143,6 +143,43 @@ export interface paths {
         patch: operations["update_hosted_zone_api_v1_hosted_zones__zone_id__patch"];
         trace?: never;
     };
+    "/api/v1/hosted-zones/{zone_id}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search, filter and page record sets */
+        get: operations["list_record_sets_api_v1_hosted_zones__zone_id__records_get"];
+        put?: never;
+        /** Create Record Set */
+        post: operations["create_record_set_api_v1_hosted_zones__zone_id__records_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hosted-zones/{zone_id}/records/{record_set_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Record Set */
+        get: operations["get_record_set_api_v1_hosted_zones__zone_id__records__record_set_id__get"];
+        /** Update Record Set */
+        put: operations["update_record_set_api_v1_hosted_zones__zone_id__records__record_set_id__put"];
+        post?: never;
+        /** Delete Record Set */
+        delete: operations["delete_record_set_api_v1_hosted_zones__zone_id__records__record_set_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -306,6 +343,85 @@ export interface components {
         HostedZoneUpdate: {
             /** Comment */
             comment: string | null;
+        };
+        /** RecordSetCreate */
+        RecordSetCreate: {
+            /**
+             * Name
+             * @description A name relative to the zone, an absolute name, or @ for the zone apex.
+             * @example www
+             */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA";
+            /**
+             * Ttl
+             * @example 300
+             */
+            ttl: number;
+            /** Values */
+            values: string[];
+        };
+        /** RecordSetList */
+        RecordSetList: {
+            /** Items */
+            items: components["schemas"]["RecordSetOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** RecordSetOut */
+        RecordSetOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA" | "SOA";
+            /** Ttl */
+            ttl: number;
+            /** Values */
+            values: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** RecordSetUpdate */
+        RecordSetUpdate: {
+            /**
+             * Name
+             * @description A name relative to the zone, an absolute name, or @ for the zone apex.
+             * @example www
+             */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA";
+            /**
+             * Ttl
+             * @example 300
+             */
+            ttl: number;
+            /** Values */
+            values: string[];
         };
         /** SignInRequest */
         SignInRequest: {
@@ -692,6 +808,177 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HostedZoneDetail"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_record_sets_api_v1_hosted_zones__zone_id__records_get: {
+        parameters: {
+            query?: {
+                /** @description Case-insensitive text to find in the record name or value. */
+                q?: string | null;
+                type?: ("A" | "AAAA" | "CNAME" | "TXT" | "MX" | "NS" | "PTR" | "SRV" | "CAA" | "SOA") | null;
+                sort?: "name" | "-name" | "type" | "-type" | "ttl" | "-ttl";
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSetList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_record_set_api_v1_hosted_zones__zone_id__records_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordSetCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_record_set_api_v1_hosted_zones__zone_id__records__record_set_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+                record_set_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_record_set_api_v1_hosted_zones__zone_id__records__record_set_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+                record_set_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecordSetUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordSetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_record_set_api_v1_hosted_zones__zone_id__records__record_set_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+                record_set_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
