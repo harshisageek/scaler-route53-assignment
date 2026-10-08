@@ -24,10 +24,18 @@ class AppError(Exception):
     status_code: int = status.HTTP_400_BAD_REQUEST
     code: str = "BadRequest"
 
-    def __init__(self, message: str, details: dict[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        details: dict[str, Any] | None = None,
+        *,
+        code: str | None = None,
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details or {}
+        if code is not None:
+            self.code = code
 
 
 class NotFoundError(AppError):
@@ -48,6 +56,11 @@ class ValidationFailedError(AppError):
 class UnauthorizedError(AppError):
     status_code = status.HTTP_401_UNAUTHORIZED
     code = "Unauthorized"
+
+
+class TooManyRequestsError(AppError):
+    status_code = status.HTTP_429_TOO_MANY_REQUESTS
+    code = "TooManyRequests"
 
 
 def error_body(code: str, message: str, details: dict[str, Any] | None = None) -> dict[str, Any]:

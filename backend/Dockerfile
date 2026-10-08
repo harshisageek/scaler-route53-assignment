@@ -59,7 +59,8 @@ RUN useradd --create-home --uid 1000 appuser \
 USER appuser
 
 ENV DATABASE_URL=sqlite:////data/route53.db \
-    APP_ENV=production
+    APP_ENV=production \
+    SESSION_COOKIE_SECURE=true
 
 EXPOSE 8000
 CMD ["./scripts/start.sh"]
