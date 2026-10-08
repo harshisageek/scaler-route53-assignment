@@ -1,12 +1,18 @@
 """FastAPI application factory."""
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.db.session import create_db_engine
+from app.services.seed import seed_demo_data
 
 DESCRIPTION = """
 A clone of the AWS Route 53 console: hosted zones and DNS records, with the
@@ -15,9 +21,26 @@ it does not answer DNS queries.
 """
 
 
+def _seed_on_startup(settings: Settings) -> None:
+    engine = create_db_engine(settings)
+    try:
+        with Session(engine) as db:
+            added = seed_demo_data(db)
+            db.commit()
+    finally:
+        engine.dispose()
+    get_logger(__name__).info("seed.completed", zones_added=added)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     configure_logging(settings)
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if settings.seed_demo_data:
+            _seed_on_startup(settings)
+        yield
 
     app = FastAPI(
         title="Route 53 Clone API",
@@ -25,6 +48,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         version="1.0.0",
         docs_url="/docs",
         openapi_url="/openapi.json",
+        lifespan=lifespan,
     )
 
     # Local development only: in production Next.js proxies /api/* so the
