@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ConflictError, NotFoundError
 from app.models import HostedZone, RecordSet, User
+from app.models import HostedZoneTag as HostedZoneTagModel
 from app.repositories import hosted_zones as repository
 from app.repositories import record_sets
 from app.schemas.hosted_zone import (
@@ -13,6 +14,9 @@ from app.schemas.hosted_zone import (
     HostedZoneUpdate,
     Vpc,
 )
+from app.schemas.hosted_zone import (
+    HostedZoneTag as HostedZoneTagOut,
+)
 from app.services import name_servers
 from app.services.ids import new_hosted_zone_id
 
@@ -22,12 +26,15 @@ def list_hosted_zones(db: Session, owner: User, params: HostedZoneListParams) ->
         db,
         owner.id,
         q=params.q,
+        tag_key=params.tag_key,
+        tag_value=params.tag_value,
         sort=params.sort,
         offset=(params.page - 1) * params.page_size,
         limit=params.page_size,
     )
+    tags_by_zone = repository.get_tags_by_zone_ids(db, [zone.id for zone, _ in rows])
     return HostedZoneList(
-        items=[_summary(zone, record_count) for zone, record_count in rows],
+        items=[_summary(zone, record_count, tags_by_zone[zone.id]) for zone, record_count in rows],
         total=total,
         page=params.page,
         page_size=params.page_size,
@@ -43,6 +50,12 @@ def update_hosted_zone(
 ) -> HostedZoneDetail:
     zone = _owned_zone(db, owner, zone_id)
     zone.comment = request.comment
+    if request.tags is not None:
+        repository.replace_tags(
+            db,
+            zone.id,
+            [(tag.key, tag.value) for tag in request.tags],
+        )
     db.commit()
     return _detail(db, zone)
 
@@ -87,6 +100,11 @@ def add_hosted_zone(db: Session, owner_id: int, request: HostedZoneCreate) -> Ho
             vpc_id=request.vpc.vpc_id if request.vpc else None,
         ),
     )
+    repository.replace_tags(
+        db,
+        zone.id,
+        [(tag.key, tag.value) for tag in request.tags],
+    )
     record_sets.add_record_sets(
         db,
         [
@@ -121,13 +139,18 @@ def _owned_zone(db: Session, owner: User, zone_id: str) -> HostedZone:
     return zone
 
 
-def _summary(zone: HostedZone, record_count: int) -> HostedZoneOut:
+def _summary(
+    zone: HostedZone,
+    record_count: int,
+    tags: list[HostedZoneTagModel],
+) -> HostedZoneOut:
     return HostedZoneOut(
         id=zone.id,
         name=zone.name,
         comment=zone.comment,
         private_zone=zone.private_zone,
         record_count=record_count,
+        tags=[HostedZoneTagOut(key=tag.key, value=tag.value) for tag in tags],
         created_at=zone.created_at,
     )
 
@@ -138,8 +161,13 @@ def _detail(db: Session, zone: HostedZone) -> HostedZoneDetail:
         if zone.vpc_region is not None and zone.vpc_id is not None
         else None
     )
+    tags = repository.get_tags_by_zone_ids(db, [zone.id])[zone.id]
     return HostedZoneDetail(
-        **_summary(zone, record_sets.count_by_zone(db, [zone.id])[zone.id]).model_dump(),
+        **_summary(
+            zone,
+            record_sets.count_by_zone(db, [zone.id])[zone.id],
+            tags,
+        ).model_dump(),
         updated_at=zone.updated_at,
         name_servers=zone.name_servers,
         vpc=vpc,

@@ -1,5 +1,6 @@
 'use client';
 
+import Alert from '@cloudscape-design/components/alert';
 import Button from '@cloudscape-design/components/button';
 import Container from '@cloudscape-design/components/container';
 import Form from '@cloudscape-design/components/form';
@@ -25,9 +26,12 @@ import {
   validateVpcId,
   validateZoneName,
 } from './validation';
+import { type EditableTag, tagsForRequest, ZoneTagEditor } from './ZoneTagEditor';
 
 type ZoneType = 'public' | 'private';
-type Errors = Partial<Record<'name' | 'comment' | 'region' | 'vpcId' | 'form', string>>;
+type Errors = Partial<
+  Record<'name' | 'comment' | 'region' | 'vpcId' | 'tags' | 'form', string>
+>;
 
 const REGION_OPTIONS: SelectProps.Option[] = AWS_REGIONS.map((region) => ({
   value: region.code,
@@ -44,6 +48,8 @@ export function CreateHostedZoneForm() {
   const [zoneType, setZoneType] = useState<ZoneType>('public');
   const [region, setRegion] = useState<SelectProps.Option | null>(null);
   const [vpcId, setVpcId] = useState('');
+  const [tags, setTags] = useState<EditableTag[]>([]);
+  const [tagsValid, setTagsValid] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
 
   const followCancel = (event: CustomEvent) => {
@@ -60,6 +66,7 @@ export function CreateHostedZoneForm() {
       if (!region) found.region = 'Choose a Region.';
       found.vpcId = validateVpcId(vpcId);
     }
+    if (!tagsValid) found.tags = 'Fix the tag errors before creating the hosted zone.';
     return Object.fromEntries(
       Object.entries(found).filter(([, message]) => message),
     ) as Errors;
@@ -82,6 +89,7 @@ export function CreateHostedZoneForm() {
               vpc_id: vpcId.trim(),
             }
           : null,
+      tags: tagsForRequest(tags),
     };
     createZone.mutate(body, {
       onSuccess: (zone) => {
@@ -103,6 +111,7 @@ export function CreateHostedZoneForm() {
           comment: fields.comment,
           region: fields['vpc.region'],
           vpcId: fields['vpc.vpc_id'],
+          tags: fields.tags,
           form: fields[''] ?? fields.vpc,
         });
       },
@@ -237,6 +246,28 @@ export function CreateHostedZoneForm() {
               </SpaceBetween>
             </Container>
           )}
+          <Container
+            header={
+              <Header
+                variant="h2"
+                description="Tags are key-value labels that help organize and filter hosted zones."
+              >
+                Tags - optional
+              </Header>
+            }
+          >
+            <SpaceBetween size="s">
+              {errors.tags && <Alert type="error">{errors.tags}</Alert>}
+              <ZoneTagEditor
+                tags={tags}
+                onChange={(next, valid) => {
+                  setTags(next);
+                  setTagsValid(valid);
+                  if (valid) setErrors((current) => ({ ...current, tags: undefined }));
+                }}
+              />
+            </SpaceBetween>
+          </Container>
         </SpaceBetween>
       </Form>
     </form>

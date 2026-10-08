@@ -14,6 +14,12 @@ import type { HostedZone } from '@/lib/api/types';
 import { useDeleteHostedZone, useUpdateHostedZone } from './api';
 import { COMMENT_MAX_LENGTH } from './validation';
 import { displayZoneName } from './format';
+import {
+  editableTags,
+  type EditableTag,
+  tagsForRequest,
+  ZoneTagEditor,
+} from './ZoneTagEditor';
 
 interface ModalProps {
   zone: HostedZone;
@@ -25,6 +31,9 @@ export function EditHostedZoneModal({ zone, onDismiss }: ModalProps) {
   const update = useUpdateHostedZone(zone.id);
   const [comment, setComment] = useState(zone.comment ?? '');
   const [clientError, setClientError] = useState<string>();
+  const [tags, setTags] = useState<EditableTag[]>(editableTags(zone.tags ?? [], true));
+  const [tagsValid, setTagsValid] = useState(true);
+  const [tagError, setTagError] = useState<string>();
   const fieldError = fieldErrorsFrom(update.error).comment;
   const zoneName = displayZoneName(zone.name);
 
@@ -33,8 +42,12 @@ export function EditHostedZoneModal({ zone, onDismiss }: ModalProps) {
       setClientError(`The description cannot exceed ${COMMENT_MAX_LENGTH} characters.`);
       return;
     }
+    if (!tagsValid) {
+      setTagError('Fix the tag errors before saving the hosted zone.');
+      return;
+    }
     update.mutate(
-      { comment },
+      { comment, tags: tagsForRequest(tags) },
       {
         onSuccess: () => {
           notify({ type: 'success', content: `${zoneName} was successfully updated.` });
@@ -79,6 +92,16 @@ export function EditHostedZoneModal({ zone, onDismiss }: ModalProps) {
             onChange={({ detail }) => {
               setComment(detail.value);
               setClientError(undefined);
+            }}
+          />
+        </FormField>
+        <FormField label="Tags - optional" errorText={tagError}>
+          <ZoneTagEditor
+            tags={tags}
+            onChange={(next, valid) => {
+              setTags(next);
+              setTagsValid(valid);
+              if (valid) setTagError(undefined);
             }}
           />
         </FormField>
