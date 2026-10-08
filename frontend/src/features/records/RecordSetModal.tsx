@@ -58,6 +58,12 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
     if (parsedValues.length === 0) {
       errors.values = 'Enter at least one value.';
     }
+    if (type === 'CNAME' && parsedValues.length !== 1) {
+      errors.values = 'A CNAME record must have exactly one value.';
+    }
+    if (type === 'CNAME' && (!name.trim() || name.trim() === '@')) {
+      errors.name = 'A CNAME record cannot be created at the zone apex.';
+    }
     setClientErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
@@ -99,13 +105,16 @@ export function RecordSetModal({ zoneId, zoneName, record, onDismiss }: Props) {
         <FormField
           label="Record name"
           description={`Leave blank for the zone apex (${zoneName}).`}
-          errorText={fieldErrors.name}
+          errorText={clientErrors.name ?? fieldErrors.name}
         >
           <Input
             value={name}
             disabled={editing}
             placeholder="www"
-            onChange={({ detail }) => setName(detail.value)}
+            onChange={({ detail }) => {
+              setName(detail.value);
+              setClientErrors((current) => ({ ...current, name: '' }));
+            }}
           />
         </FormField>
         <FormField label="Record type" errorText={fieldErrors.type}>

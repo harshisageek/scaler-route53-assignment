@@ -117,6 +117,10 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
   const sortingColumn = COLUMNS.find((column) => column.sortingField === sortField);
   const pagesCount = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
   const hasFilters = query.tokens.length > 0;
+  const isDefaultRecord =
+    selected !== undefined &&
+    selected.name === `${zoneName}.` &&
+    (selected.type === 'NS' || selected.type === 'SOA');
 
   return (
     <>
@@ -195,12 +199,15 @@ export function RecordSetsTable({ zoneId, zoneName }: Props) {
             actions={
               <SpaceBetween direction="horizontal" size="xs">
                 <Button
-                  disabled={!selected || selected.type === 'SOA'}
+                  disabled={!selected || selected.type === 'SOA' || isDefaultRecord}
                   onClick={() => setEditing(true)}
                 >
                   Edit
                 </Button>
-                <Button disabled={!selected} onClick={() => setDeleting(true)}>
+                <Button
+                  disabled={!selected || isDefaultRecord}
+                  onClick={() => setDeleting(true)}
+                >
                   Delete
                 </Button>
                 <Button variant="primary" onClick={() => setCreating(true)}>

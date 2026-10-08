@@ -134,6 +134,30 @@ describe('RecordSetModal', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('checks the CNAME apex and single-value rules before calling the API', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    renderModal(
+      <RecordSetModal zoneId="Z1" zoneName="example.com" onDismiss={vi.fn()} />,
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: /Record type/ }));
+    await userEvent.click(screen.getByRole('option', { name: /CNAME/ }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Value' }),
+      'one.example.com\ntwo.example.com',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Create record' }));
+
+    expect(
+      screen.getByText('A CNAME record cannot be created at the zone apex.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('A CNAME record must have exactly one value.'),
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('shows a duplicate-record conflict without closing the form', async () => {
     vi.stubGlobal(
       'fetch',
