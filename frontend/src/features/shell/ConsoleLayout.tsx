@@ -1,6 +1,6 @@
 'use client';
 
-import AppLayout from '@cloudscape-design/components/app-layout';
+import AppLayout, { type AppLayoutProps } from '@cloudscape-design/components/app-layout';
 import Box from '@cloudscape-design/components/box';
 import BreadcrumbGroup from '@cloudscape-design/components/breadcrumb-group';
 import Button from '@cloudscape-design/components/button';
@@ -13,9 +13,18 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useMe, useSignOut } from '@/features/auth/api';
 import { SIGN_IN_PATH, formatAccountId, signInUrl } from '@/features/auth/redirect';
+import { useHostedZone } from '@/features/hosted-zones/api';
+import { displayZoneName } from '@/features/hosted-zones/format';
 import { ApiError } from '@/lib/api/errors';
 import type { User } from '@/lib/api/types';
-import { NAV_HEADER, NAV_ITEMS, ROUTES, breadcrumbsFor } from './navigation';
+import { FlashMessages, FlashProvider } from './flash';
+import {
+  NAV_HEADER,
+  NAV_ITEMS,
+  ROUTES,
+  breadcrumbsFor,
+  zoneIdFromPath,
+} from './navigation';
 
 type FollowEvent = CustomEvent<{ href?: string; external?: boolean }>;
 
@@ -80,9 +89,11 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
   };
 
   const accountId = formatAccountId(user.account_id);
+  const zone = useHostedZone(zoneIdFromPath(pathname));
+  const zoneName = zone.data ? displayZoneName(zone.data.name) : undefined;
 
   return (
-    <>
+    <FlashProvider>
       <div id="top-nav">
         <TopNavigation
           identity={{
@@ -114,8 +125,9 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
       </div>
       <AppLayout
         headerSelector="#top-nav"
-        contentType="table"
+        contentType={contentTypeFor(pathname)}
         toolsHide
+        notifications={<FlashMessages />}
         navigationOpen={navigationOpen}
         onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}
         navigation={
@@ -128,13 +140,19 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
         }
         breadcrumbs={
           <BreadcrumbGroup
-            items={breadcrumbsFor(pathname)}
+            items={breadcrumbsFor(pathname, zoneName)}
             ariaLabel="Breadcrumbs"
             onFollow={followInternal}
           />
         }
         content={children}
       />
-    </>
+    </FlashProvider>
   );
+}
+
+function contentTypeFor(pathname: string): AppLayoutProps.ContentType {
+  if (pathname === ROUTES.hostedZones) return 'table';
+  if (pathname === ROUTES.createHostedZone) return 'form';
+  return 'default';
 }

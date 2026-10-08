@@ -116,7 +116,8 @@ export interface paths {
         /** List your hosted zones */
         get: operations["list_hosted_zones_api_v1_hosted_zones_get"];
         put?: never;
-        post?: never;
+        /** Create a hosted zone with its default NS and SOA records */
+        post: operations["create_hosted_zone_api_v1_hosted_zones_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -158,6 +159,93 @@ export interface components {
             /** Database */
             database: string;
         };
+        /**
+         * HostedZoneCreate
+         * @example {
+         *       "comment": "Production zone",
+         *       "name": "example.com",
+         *       "private_zone": false
+         *     }
+         * @example {
+         *       "name": "internal.example.com",
+         *       "private_zone": true,
+         *       "vpc": {
+         *         "region": "us-east-1",
+         *         "vpc_id": "vpc-0a1b2c3d"
+         *       }
+         *     }
+         */
+        HostedZoneCreate: {
+            /**
+             * Name
+             * @description Domain name. Case, a trailing dot and surrounding spaces don't matter.
+             */
+            name: string;
+            /** Comment */
+            comment?: string | null;
+            /**
+             * Private Zone
+             * @default false
+             */
+            private_zone: boolean;
+            /** @description Required for private zones only. */
+            vpc?: components["schemas"]["Vpc"] | null;
+        };
+        /**
+         * HostedZoneDetail
+         * @example {
+         *       "comment": "Production zone",
+         *       "created_at": "2026-10-01T12:00:00Z",
+         *       "id": "Z0812345ABCDEFGHIJKLM",
+         *       "name": "example.com.",
+         *       "name_servers": [
+         *         "ns-1234.awsdns-26.org.",
+         *         "ns-567.awsdns-06.net.",
+         *         "ns-1789.awsdns-31.co.uk.",
+         *         "ns-89.awsdns-11.com."
+         *       ],
+         *       "private_zone": false,
+         *       "record_count": 2,
+         *       "updated_at": "2026-10-01T12:00:00Z"
+         *     }
+         */
+        HostedZoneDetail: {
+            /**
+             * Id
+             * @description Route 53 style hosted zone ID.
+             */
+            id: string;
+            /**
+             * Name
+             * @description Fully qualified domain name, with the trailing dot.
+             */
+            name: string;
+            /** Comment */
+            comment: string | null;
+            /** Private Zone */
+            private_zone: boolean;
+            /**
+             * Record Count
+             * @description Record sets in the zone, including NS and SOA.
+             */
+            record_count: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Name Servers
+             * @description The four servers Route 53 assigned.
+             */
+            name_servers: string[];
+            vpc: components["schemas"]["Vpc"] | null;
+        };
         /** HostedZoneList */
         HostedZoneList: {
             /** Items */
@@ -175,7 +263,8 @@ export interface components {
          *       "created_at": "2026-10-01T12:00:00Z",
          *       "id": "Z0812345ABCDEFGHIJKLM",
          *       "name": "example.com.",
-         *       "private_zone": false
+         *       "private_zone": false,
+         *       "record_count": 2
          *     }
          */
         HostedZoneOut: {
@@ -193,6 +282,11 @@ export interface components {
             comment: string | null;
             /** Private Zone */
             private_zone: boolean;
+            /**
+             * Record Count
+             * @description Record sets in the zone, including NS and SOA.
+             */
+            record_count: number;
             /**
              * Created At
              * Format: date-time
@@ -254,6 +348,23 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * Vpc
+         * @description A mocked VPC. Nothing is looked up; the values only have to look right.
+         */
+        Vpc: {
+            /**
+             * Region
+             * @example us-east-1
+             * @enum {string}
+             */
+            region: "us-east-1" | "us-east-2" | "us-west-1" | "us-west-2" | "af-south-1" | "ap-east-1" | "ap-south-1" | "ap-south-2" | "ap-northeast-1" | "ap-northeast-2" | "ap-northeast-3" | "ap-southeast-1" | "ap-southeast-2" | "ap-southeast-3" | "ca-central-1" | "eu-central-1" | "eu-central-2" | "eu-west-1" | "eu-west-2" | "eu-west-3" | "eu-north-1" | "eu-south-1" | "me-south-1" | "me-central-1" | "sa-east-1";
+            /**
+             * Vpc Id
+             * @example vpc-0a1b2c3d
+             */
+            vpc_id: string;
         };
     };
     responses: never;
@@ -428,6 +539,39 @@ export interface operations {
             };
         };
     };
+    create_hosted_zone_api_v1_hosted_zones_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostedZoneCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostedZoneDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_hosted_zone_api_v1_hosted_zones__zone_id__get: {
         parameters: {
             query?: never;
@@ -445,7 +589,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HostedZoneOut"];
+                    "application/json": components["schemas"]["HostedZoneDetail"];
                 };
             };
             /** @description Validation Error */

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
-from app.models import HostedZone, User
-from app.schemas.hosted_zone import HostedZoneList, HostedZoneOut
+from app.models import User
+from app.schemas.hosted_zone import HostedZoneCreate, HostedZoneDetail, HostedZoneList
 from app.services import hosted_zones as service
 
 router = APIRouter(prefix="/hosted-zones", tags=["hosted zones"])
@@ -17,8 +17,25 @@ def list_hosted_zones(
     return service.list_hosted_zones(db, user)
 
 
-@router.get("/{zone_id}", response_model=HostedZoneOut, summary="Get one hosted zone")
+@router.post(
+    "",
+    response_model=HostedZoneDetail,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a hosted zone with its default NS and SOA records",
+)
+def create_hosted_zone(
+    body: HostedZoneCreate,
+    response: Response,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> HostedZoneDetail:
+    zone = service.create_hosted_zone(db, user, body)
+    response.headers["Location"] = f"/api/v1/hosted-zones/{zone.id}"
+    return zone
+
+
+@router.get("/{zone_id}", response_model=HostedZoneDetail, summary="Get one hosted zone")
 def get_hosted_zone(
     zone_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)
-) -> HostedZone:
+) -> HostedZoneDetail:
     return service.get_hosted_zone(db, user, zone_id)

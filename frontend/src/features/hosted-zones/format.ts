@@ -9,3 +9,14 @@ export function displayZoneName(name: string): string {
 export function displayZoneType(privateZone: boolean): string {
   return privateZone ? 'Private' : 'Public';
 }
+
+/** "October 1, 2026 at 12:00 (UTC)": always in UTC, so it reads the same for everyone. */
+export function displayTimestamp(iso: string): string {
+  const formatted = new Intl.DateTimeFormat('en-US', {
+    dateStyle: 'long',
+    timeStyle: 'short',
+    hourCycle: 'h23',
+    timeZone: 'UTC',
+  }).format(new Date(iso));
+  return `${formatted} (UTC)`;
+}

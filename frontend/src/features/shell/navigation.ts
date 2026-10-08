@@ -4,6 +4,8 @@ import type { SideNavigationProps } from '@cloudscape-design/components/side-nav
 export const ROUTES = {
   home: '/route53',
   hostedZones: '/route53/hosted-zones',
+  createHostedZone: '/route53/hosted-zones/create',
+  hostedZone: (zoneId: string) => `/route53/hosted-zones/${encodeURIComponent(zoneId)}`,
 } as const;
 
 export const NAV_HEADER: SideNavigationProps.Header = {
@@ -16,11 +18,40 @@ export const NAV_ITEMS: SideNavigationProps.Item[] = [
 ];
 
 const ROOT_CRUMB: BreadcrumbGroupProps.Item = { text: 'Route 53', href: ROUTES.home };
-
-const CRUMBS_BY_PATH: Record<string, BreadcrumbGroupProps.Item[]> = {
-  [ROUTES.hostedZones]: [ROOT_CRUMB, { text: 'Hosted zones', href: ROUTES.hostedZones }],
+const ZONES_CRUMB: BreadcrumbGroupProps.Item = {
+  text: 'Hosted zones',
+  href: ROUTES.hostedZones,
 };
 
-export function breadcrumbsFor(pathname: string): BreadcrumbGroupProps.Item[] {
+const CRUMBS_BY_PATH: Record<string, BreadcrumbGroupProps.Item[]> = {
+  [ROUTES.hostedZones]: [ROOT_CRUMB, ZONES_CRUMB],
+  [ROUTES.createHostedZone]: [
+    ROOT_CRUMB,
+    ZONES_CRUMB,
+    { text: 'Create hosted zone', href: ROUTES.createHostedZone },
+  ],
+};
+
+const ZONE_PATH = /^\/route53\/hosted-zones\/([^/]+)$/;
+
+/** The zone ID in a zone page's path, or undefined on any other page. */
+export function zoneIdFromPath(pathname: string): string | undefined {
+  if (pathname === ROUTES.createHostedZone) return undefined;
+  const encoded = ZONE_PATH.exec(pathname)?.[1];
+  return encoded ? decodeURIComponent(encoded) : undefined;
+}
+
+/**
+ * Breadcrumbs for a page. A zone page shows the zone's name once it has
+ * loaded, and its ID until then.
+ */
+export function breadcrumbsFor(
+  pathname: string,
+  zoneName?: string,
+): BreadcrumbGroupProps.Item[] {
+  const zoneId = zoneIdFromPath(pathname);
+  if (zoneId) {
+    return [ROOT_CRUMB, ZONES_CRUMB, { text: zoneName ?? zoneId, href: pathname }];
+  }
   return CRUMBS_BY_PATH[pathname] ?? [ROOT_CRUMB];
 }

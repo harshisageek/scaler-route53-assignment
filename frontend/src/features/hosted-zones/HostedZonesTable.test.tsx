@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { HostedZoneList } from '@/lib/api/types';
 import { HostedZonesTable } from './HostedZonesTable';
 
+const router = { push: vi.fn() };
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+
 function renderTable() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -26,6 +29,7 @@ const ONE_ZONE: HostedZoneList = {
       name: 'example.com.',
       comment: 'Production zone',
       private_zone: false,
+      record_count: 7,
       created_at: '2026-10-01T12:00:00Z',
     },
   ],
@@ -45,7 +49,21 @@ describe('HostedZonesTable', () => {
     expect(screen.getByText('Public')).toBeInTheDocument();
     expect(screen.getByText('Production zone')).toBeInTheDocument();
     expect(screen.getByText('Z0812345ABCDEFGHIJKLM')).toBeInTheDocument();
+    expect(screen.getByText('7')).toBeInTheDocument();
     expect(screen.getByText('(1)')).toBeInTheDocument();
+  });
+
+  it('links each zone to its details and offers to create one', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, ONE_ZONE)));
+
+    renderTable();
+
+    await userEvent.click(await screen.findByRole('link', { name: 'example.com' }));
+    expect(router.push).toHaveBeenCalledWith(
+      '/route53/hosted-zones/Z0812345ABCDEFGHIJKLM',
+    );
+    await userEvent.click(screen.getByRole('link', { name: 'Create hosted zone' }));
+    expect(router.push).toHaveBeenCalledWith('/route53/hosted-zones/create');
   });
 
   it('explains an empty account instead of showing a blank table', async () => {

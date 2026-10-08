@@ -1,7 +1,7 @@
 """The database rejects bad data on its own, even if a bug slips past the API."""
 
 import pytest
-from app.models import HostedZone, User
+from app.models import HostedZone, RecordSet, User
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -50,6 +50,45 @@ def test_deleting_a_user_deletes_their_zones(db_session: Session, owner: User) -
     db_session.commit()
 
     assert db_session.scalars(select(HostedZone)).all() == []
+
+
+@pytest.mark.parametrize(
+    ("private_zone", "vpc_region", "vpc_id"),
+    [(True, None, None), (False, "us-east-1", "vpc-0a1b2c3d"), (True, "us-east-1", None)],
+)
+def test_only_private_zones_have_a_vpc_and_they_always_do(
+    db_session: Session,
+    owner: User,
+    private_zone: bool,
+    vpc_region: str | None,
+    vpc_id: str | None,
+) -> None:
+    db_session.add(
+        HostedZone(
+            id="ZAAAAAAAAAAAAAAAAAAAA",
+            owner_id=owner.id,
+            name="a.",
+            private_zone=private_zone,
+            vpc_region=vpc_region,
+            vpc_id=vpc_id,
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_deleting_a_zone_deletes_its_records(db_session: Session, owner: User) -> None:
+    zone = HostedZone(id="ZAAAAAAAAAAAAAAAAAAAA", owner_id=owner.id, name="a.")
+    db_session.add(zone)
+    db_session.flush()
+    db_session.add(RecordSet(hosted_zone_id=zone.id, name="a.", type="NS", ttl=60, values=[]))
+    db_session.commit()
+
+    db_session.delete(zone)
+    db_session.commit()
+
+    assert db_session.scalars(select(RecordSet)).all() == []
 
 
 def test_two_accounts_cannot_share_an_email(db_session: Session, owner: User) -> None:
