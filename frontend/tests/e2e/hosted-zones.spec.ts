@@ -53,3 +53,61 @@ test('an unknown zone ID says so instead of crashing', async ({ page }) => {
     page.getByText('No hosted zone found with ID ZDOESNOTEXIST.'),
   ).toBeVisible();
 });
+
+test('a zone description can be edited and an empty zone can be deleted', async ({
+  page,
+}) => {
+  await signUp(page, uniqueEmail());
+  const created = await page.request.post('/api/v1/hosted-zones', {
+    data: { name: 'lifecycle.example.com', comment: 'Old description' },
+  });
+  const zone = (await created.json()) as { id: string };
+  await page.goto(`/route53/hosted-zones/${zone.id}`);
+
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const editDialog = page.getByRole('dialog', { name: 'Edit hosted zone' });
+  await editDialog.getByRole('textbox', { name: /Description/ }).fill('New description');
+  await editDialog.getByRole('button', { name: 'Save changes' }).click();
+  await expect(
+    page.getByText('lifecycle.example.com was successfully updated.'),
+  ).toBeVisible();
+  await expect(page.getByText('New description').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Delete' }).click();
+  const deleteDialog = page.getByRole('dialog', { name: 'Delete hosted zone' });
+  await expect(
+    deleteDialog.getByText('Deleting a hosted zone cannot be undone.'),
+  ).toBeVisible();
+  await deleteDialog.getByRole('button', { name: 'Delete' }).click();
+
+  await expect(page).toHaveURL(/\/route53\/hosted-zones$/);
+  await expect(
+    page.getByText('lifecycle.example.com was successfully deleted.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('rowheader', { name: 'lifecycle.example.com' }),
+  ).toHaveCount(0);
+});
+
+test('the hosted zones list searches and sorts on the server', async ({ page }) => {
+  await signUp(page, uniqueEmail());
+  for (const name of ['alpha.example.com', 'gamma.example.com', 'beta.example.com']) {
+    const response = await page.request.post('/api/v1/hosted-zones', {
+      data: { name },
+    });
+    expect(response.ok()).toBeTruthy();
+  }
+  await page.goto('/route53/hosted-zones');
+
+  await page.getByRole('searchbox', { name: 'Find hosted zones' }).fill('beta');
+  await expect(page.getByRole('rowheader', { name: 'beta.example.com' })).toBeVisible();
+  await expect(page.getByRole('rowheader', { name: 'alpha.example.com' })).toHaveCount(0);
+
+  await page.getByRole('searchbox', { name: 'Find hosted zones' }).fill('');
+  await page.getByRole('button', { name: 'Hosted zone name' }).click();
+  await expect(page.getByRole('rowheader')).toHaveText([
+    'gamma.example.com',
+    'beta.example.com',
+    'alpha.example.com',
+  ]);
+});

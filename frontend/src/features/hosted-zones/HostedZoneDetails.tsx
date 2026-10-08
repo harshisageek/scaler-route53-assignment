@@ -10,15 +10,19 @@ import SpaceBetween from '@cloudscape-design/components/space-between';
 import Spinner from '@cloudscape-design/components/spinner';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { ROUTES } from '@/features/shell/navigation';
 import { ApiError } from '@/lib/api/errors';
 import type { HostedZoneDetail } from '@/lib/api/types';
 import { useHostedZone } from './api';
 import { displayTimestamp, displayZoneName, displayZoneType } from './format';
+import { DeleteHostedZoneModal, EditHostedZoneModal } from './HostedZoneModals';
 import { AWS_REGIONS } from './regions';
 
 export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
   const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { data: zone, error, isPending, refetch } = useHostedZone(zoneId);
 
   if (isPending) {
@@ -50,21 +54,41 @@ export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
   }
 
   return (
-    <ContentLayout
-      header={
-        <Header variant="h1" description={zone.comment ?? undefined}>
-          {displayZoneName(zone.name)}
-        </Header>
-      }
-    >
-      <ExpandableSection
-        variant="container"
-        defaultExpanded
-        headerText="Hosted zone details"
+    <>
+      <ContentLayout
+        header={
+          <Header
+            variant="h1"
+            description={zone.comment ?? undefined}
+            actions={
+              <SpaceBetween direction="horizontal" size="xs">
+                <Button onClick={() => setEditing(true)}>Edit</Button>
+                <Button onClick={() => setDeleting(true)}>Delete</Button>
+              </SpaceBetween>
+            }
+          >
+            {displayZoneName(zone.name)}
+          </Header>
+        }
       >
-        <KeyValuePairs columns={3} items={detailItems(zone)} />
-      </ExpandableSection>
-    </ContentLayout>
+        <ExpandableSection
+          variant="container"
+          defaultExpanded
+          headerText="Hosted zone details"
+        >
+          <KeyValuePairs columns={3} items={detailItems(zone)} />
+        </ExpandableSection>
+      </ContentLayout>
+      {editing && <EditHostedZoneModal zone={zone} onDismiss={() => setEditing(false)} />}
+      {deleting && (
+        <DeleteHostedZoneModal
+          zone={zone}
+          successPath={ROUTES.hostedZones}
+          onDismiss={() => setDeleting(false)}
+          onDeleted={() => router.push(ROUTES.hostedZones)}
+        />
+      )}
+    </>
   );
 }
 

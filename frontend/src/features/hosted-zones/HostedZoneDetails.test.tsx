@@ -1,10 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FlashMessages, FlashProvider } from '@/features/shell/flash';
 import type { HostedZoneDetail } from '@/lib/api/types';
 import { HostedZoneDetails } from './HostedZoneDetails';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => '/route53/hosted-zones/ZPRIVATE1234567890ABC',
+}));
 
 const PRIVATE_ZONE: HostedZoneDetail = {
   id: 'ZPRIVATE1234567890ABC',
@@ -26,7 +30,10 @@ function renderDetails(zoneId: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <HostedZoneDetails zoneId={zoneId} />
+      <FlashProvider>
+        <FlashMessages />
+        <HostedZoneDetails zoneId={zoneId} />
+      </FlashProvider>
     </QueryClientProvider>,
   );
 }

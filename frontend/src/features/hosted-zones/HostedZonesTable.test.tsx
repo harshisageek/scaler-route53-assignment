@@ -1,18 +1,25 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { FlashMessages, FlashProvider } from '@/features/shell/flash';
 import type { HostedZoneList } from '@/lib/api/types';
 import { HostedZonesTable } from './HostedZonesTable';
 
 const router = { push: vi.fn() };
-vi.mock('next/navigation', () => ({ useRouter: () => router }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  usePathname: () => '/route53/hosted-zones',
+}));
 
 function renderTable() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <HostedZonesTable />
+      <FlashProvider>
+        <FlashMessages />
+        <HostedZonesTable />
+      </FlashProvider>
     </QueryClientProvider>,
   );
 }
@@ -23,6 +30,8 @@ function jsonResponse(status: number, body: unknown): Response {
 
 const ONE_ZONE: HostedZoneList = {
   total: 1,
+  page: 1,
+  page_size: 10,
   items: [
     {
       id: 'Z0812345ABCDEFGHIJKLM',
@@ -37,6 +46,7 @@ const ONE_ZONE: HostedZoneList = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.clearAllMocks();
 });
 
 describe('HostedZonesTable', () => {
@@ -53,6 +63,53 @@ describe('HostedZonesTable', () => {
     expect(screen.getByText('(1)')).toBeInTheDocument();
   });
 
+  it('searches on the server and explains when nothing matches', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, ONE_ZONE))
+      .mockResolvedValueOnce(
+        jsonResponse(200, { items: [], total: 0, page: 1, page_size: 10 }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    renderTable();
+    await screen.findByText('example.com');
+
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Find hosted zones' }),
+      'missing',
+    );
+
+    expect(await screen.findByText('No matches')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      '/api/v1/hosted-zones?q=missing&sort=name&page=1&page_size=10',
+      expect.anything(),
+    );
+  });
+
+  it('sends sorting and page changes to the server', async () => {
+    const twoPages = { ...ONE_ZONE, total: 11 };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, twoPages));
+    vi.stubGlobal('fetch', fetchMock);
+    renderTable();
+    await screen.findByText('example.com');
+
+    await userEvent.click(screen.getByRole('button', { name: /Hosted zone name/ }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/hosted-zones?sort=-name&page=1&page_size=10',
+        expect.anything(),
+      ),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: '2' }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/v1/hosted-zones?sort=-name&page=2&page_size=10',
+        expect.anything(),
+      ),
+    );
+  });
+
   it('links each zone to its details and offers to create one', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, ONE_ZONE)));
 
@@ -64,12 +121,22 @@ describe('HostedZonesTable', () => {
     );
     await userEvent.click(screen.getByRole('link', { name: 'Create hosted zone' }));
     expect(router.push).toHaveBeenCalledWith('/route53/hosted-zones/create');
+
+    await userEvent.click(screen.getByRole('radio'));
+    await userEvent.click(screen.getByRole('button', { name: 'View details' }));
+    expect(router.push).toHaveBeenCalledWith(
+      '/route53/hosted-zones/Z0812345ABCDEFGHIJKLM',
+    );
   });
 
   it('explains an empty account instead of showing a blank table', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(200, { items: [], total: 0 })),
+      vi
+        .fn()
+        .mockResolvedValue(
+          jsonResponse(200, { items: [], total: 0, page: 1, page_size: 10 }),
+        ),
     );
 
     renderTable();

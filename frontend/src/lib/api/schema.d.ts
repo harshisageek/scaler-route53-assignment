@@ -113,7 +113,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List your hosted zones */
+        /** Search, sort and page your hosted zones */
         get: operations["list_hosted_zones_api_v1_hosted_zones_get"];
         put?: never;
         /** Create a hosted zone with its default NS and SOA records */
@@ -135,10 +135,12 @@ export interface paths {
         get: operations["get_hosted_zone_api_v1_hosted_zones__zone_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete a zone that has only its default NS and SOA records */
+        delete: operations["delete_hosted_zone_api_v1_hosted_zones__zone_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Edit a zone's comment */
+        patch: operations["update_hosted_zone_api_v1_hosted_zones__zone_id__patch"];
         trace?: never;
     };
 }
@@ -255,6 +257,10 @@ export interface components {
              * @description Number of hosted zones matching the request.
              */
             total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /**
          * HostedZoneOut
@@ -292,6 +298,14 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * HostedZoneUpdate
+         * @description Route 53 only lets a zone's comment change after it is created.
+         */
+        HostedZoneUpdate: {
+            /** Comment */
+            comment: string | null;
         };
         /** SignInRequest */
         SignInRequest: {
@@ -521,7 +535,14 @@ export interface operations {
     };
     list_hosted_zones_api_v1_hosted_zones_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Case-insensitive text to find in the name, ID or comment. */
+                q?: string | null;
+                /** @description Prefix with - for descending. */
+                sort?: "name" | "-name" | "type" | "-type" | "record_count" | "-record_count" | "created_at" | "-created_at";
+                page?: number;
+                page_size?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -535,6 +556,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HostedZoneList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -582,6 +612,77 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HostedZoneDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_hosted_zone_api_v1_hosted_zones__zone_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The zone still has other record sets. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_hosted_zone_api_v1_hosted_zones__zone_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zone_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HostedZoneUpdate"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
