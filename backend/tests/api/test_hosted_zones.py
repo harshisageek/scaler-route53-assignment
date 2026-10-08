@@ -18,7 +18,12 @@ def test_zones_require_a_signed_in_user(client: TestClient) -> None:
 
 
 def test_a_new_account_has_no_zones(alice: TestClient) -> None:
-    assert alice.get("/api/v1/hosted-zones").json() == {"items": [], "total": 0}
+    assert alice.get("/api/v1/hosted-zones").json() == {
+        "items": [],
+        "total": 0,
+        "page": 1,
+        "page_size": 100,
+    }
 
 
 def test_list_returns_every_field_the_console_shows(alice: TestClient, db_session: Session) -> None:

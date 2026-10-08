@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_core import PydanticCustomError
@@ -122,6 +122,40 @@ class HostedZoneDetail(HostedZoneOut):
     vpc: Vpc | None
 
 
+class HostedZoneUpdate(BaseModel):
+    """Route 53 only lets a zone's comment change after it is created."""
+
+    comment: str | None = Field(max_length=COMMENT_MAX_LENGTH)
+
+    @field_validator("comment")
+    @classmethod
+    def _blank_comment_is_none(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+
+HostedZoneSort = Literal[
+    "name", "-name", "type", "-type", "record_count", "-record_count", "created_at", "-created_at"
+]
+
+
+class HostedZoneListParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    q: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Case-insensitive text to find in the name, ID or comment.",
+    )
+    sort: HostedZoneSort = Field(default="name", description="Prefix with - for descending.")
+    page: int = Field(default=1, ge=1)
+    # Route 53's ListHostedZones also returns up to 100 by default.
+    page_size: int = Field(default=100, ge=1, le=100)
+
+
 class HostedZoneList(BaseModel):
     items: list[HostedZoneOut]
     total: int = Field(description="Number of hosted zones matching the request.")
+    page: int
+    page_size: int
