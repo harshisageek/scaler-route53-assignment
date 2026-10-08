@@ -107,6 +107,19 @@ def exists_by_name_and_type(
     return db.scalar(select(RecordSet.id).where(*filters).limit(1)) is not None
 
 
+def types_for_name(
+    db: Session,
+    zone_id: str,
+    name: str,
+    *,
+    exclude_id: int | None = None,
+) -> set[str]:
+    filters = [RecordSet.hosted_zone_id == zone_id, RecordSet.name == name]
+    if exclude_id is not None:
+        filters.append(RecordSet.id != exclude_id)
+    return set(db.scalars(select(RecordSet.type).where(*filters)).all())
+
+
 def delete_record_set(db: Session, record_set: RecordSet) -> None:
     db.delete(record_set)
     db.flush()

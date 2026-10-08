@@ -4,6 +4,7 @@ from app.core.errors import ConflictError, NotFoundError, ValidationFailedError
 from app.models import HostedZone, RecordSet, User
 from app.repositories import hosted_zones, record_sets
 from app.schemas.record_set import (
+    EditableRecordType,
     RecordSetCreate,
     RecordSetList,
     RecordSetListParams,
@@ -11,6 +12,10 @@ from app.schemas.record_set import (
     RecordSetUpdate,
 )
 from app.services.validation.domain_names import InvalidDomainNameError, normalize_record_name
+from app.services.validation.record_values import (
+    InvalidRecordValueError,
+    normalize_record_values,
+)
 
 
 def list_record_sets(
@@ -44,13 +49,15 @@ def create_record_set(
 ) -> RecordSetOut:
     zone = _owned_zone(db, owner, zone_id)
     name = _record_name(request.name, zone.name)
+    values = _record_values(request.type, request.values)
+    _ensure_cname_compatible(db, zone, name, request.type)
     _ensure_available(db, zone.id, name, request.type)
     record = RecordSet(
         hosted_zone_id=zone.id,
         name=name,
         type=request.type,
         ttl=request.ttl,
-        values=request.values,
+        values=values,
     )
     db.add(record)
     db.commit()
@@ -67,12 +74,15 @@ def update_record_set(
 ) -> RecordSetOut:
     zone = _owned_zone(db, owner, zone_id)
     record = _record_set(db, zone, record_set_id)
+    _protect_default_record(zone, record)
     name = _record_name(request.name, zone.name)
+    values = _record_values(request.type, request.values)
+    _ensure_cname_compatible(db, zone, name, request.type, exclude_id=record.id)
     _ensure_available(db, zone.id, name, request.type, exclude_id=record.id)
     record.name = name
     record.type = request.type
     record.ttl = request.ttl
-    record.values = request.values
+    record.values = values
     db.commit()
     db.refresh(record)
     return RecordSetOut.model_validate(record)
@@ -80,7 +90,9 @@ def update_record_set(
 
 def delete_record_set(db: Session, owner: User, zone_id: str, record_set_id: int) -> None:
     zone = _owned_zone(db, owner, zone_id)
-    record_sets.delete_record_set(db, _record_set(db, zone, record_set_id))
+    record = _record_set(db, zone, record_set_id)
+    _protect_default_record(zone, record)
+    record_sets.delete_record_set(db, record)
     db.commit()
 
 
@@ -112,6 +124,62 @@ def _record_name(raw: str, zone_name: str) -> str:
             "One or more fields are invalid.",
             {"fields": [{"loc": ["body", "name"], "msg": str(exc)}]},
         ) from exc
+
+
+def _record_values(record_type: EditableRecordType, values: list[str]) -> list[str]:
+    try:
+        return normalize_record_values(record_type, values)
+    except InvalidRecordValueError as exc:
+        raise ValidationFailedError(
+            "One or more fields are invalid.",
+            {"fields": [{"loc": ["body", "values"], "msg": str(exc)}]},
+        ) from exc
+
+
+def _ensure_cname_compatible(
+    db: Session,
+    zone: HostedZone,
+    name: str,
+    record_type: EditableRecordType,
+    *,
+    exclude_id: int | None = None,
+) -> None:
+    if record_type == "CNAME" and name == zone.name:
+        raise ValidationFailedError(
+            "One or more fields are invalid.",
+            {
+                "fields": [
+                    {
+                        "loc": ["body", "name"],
+                        "msg": "A CNAME record cannot be created at the zone apex.",
+                    }
+                ]
+            },
+        )
+
+    existing_types = record_sets.types_for_name(
+        db,
+        zone.id,
+        name,
+        exclude_id=exclude_id,
+    )
+    if (record_type == "CNAME" and existing_types) or (
+        record_type != "CNAME" and "CNAME" in existing_types
+    ):
+        raise ConflictError(
+            "A CNAME record cannot share its name with another record.",
+            {"name": name, "existing_types": sorted(existing_types)},
+            code="CnameConflict",
+        )
+
+
+def _protect_default_record(zone: HostedZone, record: RecordSet) -> None:
+    if record.name == zone.name and record.type in {"NS", "SOA"}:
+        raise ConflictError(
+            "The default NS and SOA records cannot be changed or deleted.",
+            {"record_set_id": record.id, "type": record.type},
+            code="ProtectedRecordSet",
+        )
 
 
 def _ensure_available(
