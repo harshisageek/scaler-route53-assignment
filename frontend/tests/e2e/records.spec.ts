@@ -63,3 +63,49 @@ test('a record can be created, edited, found and deleted', async ({ page }) => {
     0,
   );
 });
+
+test('default records are protected and CNAME mistakes stay in the form', async ({
+  page,
+}) => {
+  await signUp(page, uniqueEmail());
+  const created = await page.request.post('/api/v1/hosted-zones', {
+    data: { name: 'protected.example.com' },
+  });
+  const zone = (await created.json()) as { id: string };
+  const recordsResponse = await page.request.get(
+    `/api/v1/hosted-zones/${zone.id}/records`,
+  );
+  const records = (await recordsResponse.json()) as {
+    items: { id: number; type: string }[];
+  };
+  const ns = records.items.find((record) => record.type === 'NS');
+  expect(ns).toBeTruthy();
+
+  const attemptedDelete = await page.request.delete(
+    `/api/v1/hosted-zones/${zone.id}/records/${ns!.id}`,
+  );
+  expect(attemptedDelete.status()).toBe(409);
+  expect((await attemptedDelete.json()).error.code).toBe('ProtectedRecordSet');
+
+  await page.goto(`/route53/hosted-zones/${zone.id}`);
+  const nsRow = page.getByRole('row', { name: /protected\.example\.com.*NS/ });
+  await nsRow.getByRole('radio').check();
+  await expect(page.getByRole('button', { name: 'Edit' }).last()).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Delete' }).last()).toBeDisabled();
+
+  await page.getByRole('button', { name: 'Create record' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Create record' });
+  await dialog.getByRole('button', { name: /Record type/ }).click();
+  await page.getByRole('option', { name: /CNAME/ }).click();
+  await dialog
+    .getByRole('textbox', { name: 'Value' })
+    .fill('one.example.com\ntwo.example.com');
+  await dialog.getByRole('button', { name: 'Create record' }).click();
+
+  await expect(
+    dialog.getByText('A CNAME record cannot be created at the zone apex.'),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText('A CNAME record must have exactly one value.'),
+  ).toBeVisible();
+});

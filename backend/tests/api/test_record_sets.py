@@ -206,3 +206,123 @@ def test_an_absolute_name_outside_the_zone_is_rejected(alice: TestClient) -> Non
 
     assert response.status_code == 422
     assert response.json()["error"]["details"]["fields"][0]["loc"] == ["body", "name"]
+
+
+def test_type_specific_errors_are_returned_on_the_values_field(alice: TestClient) -> None:
+    zone = create_zone(alice)
+
+    response = alice.post(
+        records_url(zone["id"]),
+        json={"name": "www", "type": "A", "ttl": 60, "values": ["999.1.1.1"]},
+    )
+
+    assert response.status_code == 422
+    field = response.json()["error"]["details"]["fields"][0]
+    assert field["loc"] == ["body", "values"]
+    assert "valid IPv4" in field["msg"]
+
+
+def test_values_are_stored_in_canonical_form(alice: TestClient) -> None:
+    zone = create_zone(alice)
+
+    record = create_record(
+        alice,
+        zone["id"],
+        name="@",
+        record_type="MX",
+        values=["10 Mail.Example.COM"],
+    )
+
+    assert record["values"] == ["10 mail.example.com."]
+
+
+def test_a_cname_cannot_be_created_at_the_zone_apex(alice: TestClient) -> None:
+    zone = create_zone(alice)
+
+    response = alice.post(
+        records_url(zone["id"]),
+        json={
+            "name": "@",
+            "type": "CNAME",
+            "ttl": 60,
+            "values": ["target.example.com"],
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["details"]["fields"][0]["loc"] == ["body", "name"]
+
+
+def test_a_cname_cannot_share_a_name_with_another_type(alice: TestClient) -> None:
+    zone = create_zone(alice)
+    create_record(alice, zone["id"], name="www", record_type="A")
+
+    response = alice.post(
+        records_url(zone["id"]),
+        json={
+            "name": "www",
+            "type": "CNAME",
+            "ttl": 60,
+            "values": ["target.example.com"],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CnameConflict"
+
+
+def test_another_type_cannot_share_a_cname_name(alice: TestClient) -> None:
+    zone = create_zone(alice)
+    create_record(
+        alice,
+        zone["id"],
+        name="www",
+        record_type="CNAME",
+        values=["target.example.com"],
+    )
+
+    response = alice.post(
+        records_url(zone["id"]),
+        json={"name": "www", "type": "AAAA", "ttl": 60, "values": ["2001:db8::1"]},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CnameConflict"
+
+
+@pytest.mark.parametrize("record_type", ["NS", "SOA"])
+def test_default_records_cannot_be_changed_or_deleted(alice: TestClient, record_type: str) -> None:
+    zone = create_zone(alice)
+    records = alice.get(records_url(zone["id"])).json()["items"]
+    record = next(item for item in records if item["type"] == record_type)
+    url = f"{records_url(zone['id'])}/{record['id']}"
+
+    delete = alice.delete(url)
+
+    assert delete.status_code == 409
+    assert delete.json()["error"]["code"] == "ProtectedRecordSet"
+    if record_type == "NS":
+        update = alice.put(
+            url,
+            json={
+                "name": record["name"],
+                "type": "NS",
+                "ttl": 60,
+                "values": ["ns-1.example.com"],
+            },
+        )
+        assert update.status_code == 409
+        assert update.json()["error"]["code"] == "ProtectedRecordSet"
+
+
+def test_a_non_default_ns_record_can_still_be_deleted(alice: TestClient) -> None:
+    zone = create_zone(alice)
+    record = create_record(
+        alice,
+        zone["id"],
+        name="delegated",
+        record_type="NS",
+        values=["ns-1.example.com"],
+    )
+
+    assert alice.delete(f"{records_url(zone['id'])}/{record['id']}").status_code == 204

@@ -127,6 +127,18 @@ describe('RecordSetsTable', () => {
     expect(screen.getByRole('dialog', { name: 'Edit record' })).toBeInTheDocument();
   });
 
+  it('does not offer to edit or delete the default NS record', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, RECORDS)));
+    renderTable();
+    await screen.findByText('www.example.com.');
+
+    const nsRow = screen.getByRole('row', { name: /example\.com\..*NS/ });
+    await userEvent.click(within(nsRow).getByRole('radio'));
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeDisabled();
+  });
+
   it('deletes the selected record and confirms it', async () => {
     const fetchMock = vi
       .fn()
