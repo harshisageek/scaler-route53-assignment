@@ -148,6 +148,15 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
           <AppLayout
             headerSelector="#top-nav"
             contentType={contentTypeFor(pathname)}
+            ariaLabels={{
+              navigation: 'Route 53 navigation',
+              navigationClose: 'Close navigation',
+              navigationToggle: 'Open navigation',
+              notifications: 'Notifications',
+              tools: 'Help panel',
+              toolsClose: 'Close help panel',
+              toolsToggle: 'Open help panel',
+            }}
             notifications={<FlashMessages />}
             navigationOpen={navigationOpen}
             onNavigationChange={({ detail }) => setNavigationOpen(detail.open)}

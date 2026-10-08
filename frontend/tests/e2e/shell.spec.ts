@@ -7,7 +7,7 @@ test('the console navigation, help panel and coming-soon pages work together', a
   await signUp(page, uniqueEmail());
 
   await expect(page.getByRole('link', { name: 'Hosted zones' }).first()).toBeVisible();
-  await page.getByRole('button', { name: 'Help' }).click();
+  await page.getByRole('button', { name: 'Help', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Hosted zones', exact: true, level: 2 }),
   ).toBeVisible();

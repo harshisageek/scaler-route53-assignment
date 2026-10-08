@@ -11,6 +11,7 @@ from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.core.middleware import RequestContextMiddleware
 from app.db.session import create_db_engine
 from app.services.demo import ensure_demo_account
 from app.services.login_throttle import LoginThrottle
@@ -66,6 +67,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_headers=["*"],
         )
 
+    # Added last so it wraps every response, including CORS preflight failures.
+    app.add_middleware(RequestContextMiddleware, enable_hsts=settings.is_production)
     register_exception_handlers(app)
     app.include_router(api_router)
 

@@ -47,8 +47,8 @@ typecheck: ## Type-check both sides
 	$(FRONTEND) pnpm typecheck
 
 test: ## Run backend (pytest) and frontend (Vitest) tests
-	$(BACKEND) uv run pytest
-	$(FRONTEND) pnpm test
+	$(BACKEND) uv run pytest --cov=app --cov-report=term-missing --cov-fail-under=95
+	$(FRONTEND) pnpm test:coverage
 
 e2e: ## Run Playwright end-to-end tests (needs the backend running)
 	$(FRONTEND) pnpm e2e
