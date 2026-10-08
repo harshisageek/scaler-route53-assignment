@@ -14,6 +14,7 @@ from app.schemas.hosted_zone import (
     HostedZoneUpdate,
 )
 from app.services import hosted_zones as service
+from app.services import zone_export
 
 router = APIRouter(prefix="/hosted-zones", tags=["hosted zones"])
 
@@ -42,6 +43,24 @@ def create_hosted_zone(
     zone = service.create_hosted_zone(db, user, body)
     response.headers["Location"] = f"/api/v1/hosted-zones/{zone.id}"
     return zone
+
+
+@router.get("/{zone_id}/export", response_class=Response)
+def export_hosted_zone(
+    zone_id: str,
+    export_format: Annotated[
+        zone_export.ExportFormat,
+        Query(alias="format"),
+    ] = "bind",
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    exported = zone_export.export_zone(db, user, zone_id, export_format)
+    return Response(
+        content=exported.content,
+        media_type=exported.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{exported.file_name}"'},
+    )
 
 
 @router.get("/{zone_id}", response_model=HostedZoneDetail, summary="Get one hosted zone")

@@ -59,3 +59,16 @@ export async function apiUpload<TResponse>(path: string, file: File): Promise<TR
   if (!response.ok) throw await toApiError(response);
   return (await response.json()) as TResponse;
 }
+
+export async function apiDownload(
+  path: string,
+  searchParams?: RequestOptions['searchParams'],
+): Promise<{ blob: Blob; fileName: string }> {
+  const response = await fetch(buildUrl(path, searchParams), {
+    credentials: 'same-origin',
+  });
+  if (!response.ok) throw await toApiError(response);
+  const disposition = response.headers.get('Content-Disposition') ?? '';
+  const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? 'download';
+  return { blob: await response.blob(), fileName };
+}

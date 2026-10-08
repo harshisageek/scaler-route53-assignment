@@ -2,6 +2,7 @@
 
 import Box from '@cloudscape-design/components/box';
 import Button from '@cloudscape-design/components/button';
+import ButtonDropdown from '@cloudscape-design/components/button-dropdown';
 import ContentLayout from '@cloudscape-design/components/content-layout';
 import ExpandableSection from '@cloudscape-design/components/expandable-section';
 import Header from '@cloudscape-design/components/header';
@@ -14,12 +15,14 @@ import Table, { type TableProps } from '@cloudscape-design/components/table';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { RecordSetsTable } from '@/features/records/RecordSetsTable';
+import { useFlash } from '@/features/shell/flash';
 import { useHelpPanel } from '@/features/shell/help';
 import { ROUTES } from '@/features/shell/navigation';
 import { ApiError } from '@/lib/api/errors';
 import type { HostedZoneDetail, HostedZoneTag } from '@/lib/api/types';
 import { useHostedZone } from './api';
 import { displayTimestamp, displayZoneName, displayZoneType } from './format';
+import { downloadHostedZone, type ZoneExportFormat } from './export';
 import { DeleteHostedZoneModal, EditHostedZoneModal } from './HostedZoneModals';
 import { AWS_REGIONS } from './regions';
 
@@ -31,9 +34,28 @@ const TAG_COLUMNS: TableProps.ColumnDefinition<HostedZoneTag>[] = [
 export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
   const router = useRouter();
   const openHelp = useHelpPanel();
+  const notify = useFlash();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const { data: zone, error, isPending, refetch } = useHostedZone(zoneId);
+
+  const exportZone = async (format: ZoneExportFormat) => {
+    try {
+      await downloadHostedZone(zoneId, format);
+      notify({
+        type: 'success',
+        content: `${format === 'bind' ? 'BIND' : 'JSON'} export downloaded.`,
+      });
+    } catch (exportError) {
+      notify({
+        type: 'error',
+        content:
+          exportError instanceof Error
+            ? exportError.message
+            : 'The hosted zone could not be exported.',
+      });
+    }
+  };
 
   if (isPending) {
     return (
@@ -81,6 +103,17 @@ export function HostedZoneDetails({ zoneId }: { zoneId: string }) {
             }
             actions={
               <SpaceBetween direction="horizontal" size="xs">
+                <ButtonDropdown
+                  items={[
+                    { id: 'bind', text: 'Download BIND file' },
+                    { id: 'json', text: 'Download JSON file' },
+                  ]}
+                  onItemClick={({ detail }) =>
+                    void exportZone(detail.id as ZoneExportFormat)
+                  }
+                >
+                  Export
+                </ButtonDropdown>
                 <Button onClick={() => setEditing(true)}>Edit</Button>
                 <Button onClick={() => setDeleting(true)}>Delete</Button>
               </SpaceBetween>

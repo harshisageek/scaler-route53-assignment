@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { signUp, uniqueEmail } from './helpers';
 
 test('a record can be created, edited, found and deleted', async ({ page }) => {
@@ -206,4 +207,46 @@ test('a BIND zone file can be previewed and imported', async ({ page }) => {
       name: /www\.import\.example\.com.*A.*192\.0\.2\.55/,
     }),
   ).toBeVisible();
+});
+
+test('a hosted zone can be exported as BIND and JSON files', async ({ page }) => {
+  await signUp(page, uniqueEmail());
+  const created = await page.request.post('/api/v1/hosted-zones', {
+    data: { name: 'export.example.com' },
+  });
+  const zone = (await created.json()) as { id: string };
+  await page.request.post(`/api/v1/hosted-zones/${zone.id}/records`, {
+    data: {
+      name: 'www',
+      type: 'A',
+      ttl: 60,
+      values: ['192.0.2.77'],
+    },
+  });
+  await page.goto(`/route53/hosted-zones/${zone.id}`);
+
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const bindDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: 'Download BIND file' }).click();
+  const bindDownload = await bindDownloadPromise;
+  const bindPath = await bindDownload.path();
+  expect(bindDownload.suggestedFilename()).toBe('export.example.com.zone');
+  expect(bindPath).not.toBeNull();
+  expect(await readFile(bindPath!, 'utf8')).toContain(
+    'www.export.example.com. 60 IN A 192.0.2.77',
+  );
+
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  const jsonDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('menuitem', { name: 'Download JSON file' }).click();
+  const jsonDownload = await jsonDownloadPromise;
+  const jsonPath = await jsonDownload.path();
+  expect(jsonDownload.suggestedFilename()).toBe('export.example.com.json');
+  expect(jsonPath).not.toBeNull();
+  const json = JSON.parse(await readFile(jsonPath!, 'utf8')) as {
+    records: { name: string }[];
+  };
+  expect(json.records.some((record) => record.name === 'www.export.example.com.')).toBe(
+    true,
+  );
 });
