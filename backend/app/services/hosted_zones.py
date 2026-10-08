@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app.core.errors import NotFoundError
+from app.core.errors import ConflictError, NotFoundError
 from app.models import HostedZone, RecordSet, User
 from app.repositories import hosted_zones as repository
 from app.repositories import record_sets
@@ -8,24 +8,58 @@ from app.schemas.hosted_zone import (
     HostedZoneCreate,
     HostedZoneDetail,
     HostedZoneList,
+    HostedZoneListParams,
     HostedZoneOut,
+    HostedZoneUpdate,
     Vpc,
 )
 from app.services import name_servers
 from app.services.ids import new_hosted_zone_id
 
 
-def list_hosted_zones(db: Session, owner: User) -> HostedZoneList:
-    zones = repository.list_hosted_zones(db, owner.id)
-    counts = record_sets.count_by_zone(db, (zone.id for zone in zones))
+def list_hosted_zones(db: Session, owner: User, params: HostedZoneListParams) -> HostedZoneList:
+    rows, total = repository.search_hosted_zones(
+        db,
+        owner.id,
+        q=params.q,
+        sort=params.sort,
+        offset=(params.page - 1) * params.page_size,
+        limit=params.page_size,
+    )
     return HostedZoneList(
-        items=[_summary(zone, counts[zone.id]) for zone in zones],
-        total=repository.count_hosted_zones(db, owner.id),
+        items=[_summary(zone, record_count) for zone, record_count in rows],
+        total=total,
+        page=params.page,
+        page_size=params.page_size,
     )
 
 
 def get_hosted_zone(db: Session, owner: User, zone_id: str) -> HostedZoneDetail:
     return _detail(db, _owned_zone(db, owner, zone_id))
+
+
+def update_hosted_zone(
+    db: Session, owner: User, zone_id: str, request: HostedZoneUpdate
+) -> HostedZoneDetail:
+    zone = _owned_zone(db, owner, zone_id)
+    zone.comment = request.comment
+    db.commit()
+    return _detail(db, zone)
+
+
+def delete_hosted_zone(db: Session, owner: User, zone_id: str) -> None:
+    """Delete a zone, as Route 53 does, only once it holds just the default records."""
+    zone = _owned_zone(db, owner, zone_id)
+    extra = record_sets.count_non_default(db, zone)
+    if extra:
+        raise ConflictError(
+            f"This hosted zone still has {extra} record {'set' if extra == 1 else 'sets'}"
+            " besides the default NS and SOA records. Delete them first.",
+            {"record_count": extra},
+            code="HostedZoneNotEmpty",
+        )
+    repository.delete_hosted_zone(db, zone)
+    db.commit()
 
 
 def create_hosted_zone(db: Session, owner: User, request: HostedZoneCreate) -> HostedZoneDetail:
