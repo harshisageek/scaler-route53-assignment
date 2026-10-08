@@ -10,7 +10,7 @@ import Spinner from '@cloudscape-design/components/spinner';
 import StatusIndicator from '@cloudscape-design/components/status-indicator';
 import TopNavigation from '@cloudscape-design/components/top-navigation';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useMe, useSignOut } from '@/features/auth/api';
 import { SIGN_IN_PATH, formatAccountId, signInUrl } from '@/features/auth/redirect';
 import { useHostedZone } from '@/features/hosted-zones/api';
@@ -19,6 +19,7 @@ import { ApiError } from '@/lib/api/errors';
 import type { User } from '@/lib/api/types';
 import { FlashMessages, FlashProvider } from './flash';
 import { ConsoleHelp, HelpContextProvider } from './help';
+import { KeyboardShortcuts } from './KeyboardShortcuts';
 import {
   NAV_HEADER,
   NAV_ITEMS,
@@ -27,6 +28,7 @@ import {
   zoneIdFromPath,
 } from './navigation';
 import { PreferencesScope } from './TablePreferences';
+import { useTheme } from './theme';
 
 type FollowEvent = CustomEvent<{ href?: string; external?: boolean }>;
 
@@ -81,8 +83,11 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const signOut = useSignOut();
+  const { mode, toggleMode } = useTheme();
   const [navigationOpen, setNavigationOpen] = useState(true);
   const [toolsOpen, setToolsOpen] = useState(false);
+  const goTo = useCallback((href: string) => router.push(href), [router]);
+  const closePanels = useCallback(() => setToolsOpen(false), []);
 
   const followInternal = (event: FollowEvent) => {
     const { href, external } = event.detail;
@@ -117,6 +122,11 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
                   onClick: () => setToolsOpen(true),
                 },
                 {
+                  type: 'button',
+                  text: mode === 'light' ? 'Dark mode' : 'Light mode',
+                  onClick: toggleMode,
+                },
+                {
                   type: 'menu-dropdown',
                   text: user.email,
                   description: user.is_demo
@@ -134,6 +144,7 @@ function Console({ user, children }: { user: User; children: ReactNode }) {
               ]}
             />
           </div>
+          <KeyboardShortcuts pathname={pathname} goTo={goTo} closePanels={closePanels} />
           <AppLayout
             headerSelector="#top-nav"
             contentType={contentTypeFor(pathname)}

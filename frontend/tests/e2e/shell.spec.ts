@@ -40,3 +40,40 @@ test('table preferences are saved for the signed-in account', async ({ page }) =
     }),
   ).toBeChecked();
 });
+
+test('keyboard shortcuts navigate, focus search, and stay inactive while typing', async ({
+  page,
+}) => {
+  await signUp(page, uniqueEmail());
+
+  await page.keyboard.type('?');
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeHidden();
+
+  await page.keyboard.press('c');
+  await expect(page).toHaveURL(/\/route53\/hosted-zones\/create$/);
+  await page.getByRole('heading', { name: 'Create hosted zone' }).click();
+  await page.keyboard.press('g');
+  await page.keyboard.press('z');
+  await expect(page).toHaveURL(/\/route53\/hosted-zones$/);
+
+  const search = page.getByRole('combobox', { name: 'Find hosted zones' });
+  await page.keyboard.press('/');
+  await expect(search).toBeFocused();
+  await search.fill('?');
+  await expect(page.getByRole('dialog', { name: 'Keyboard shortcuts' })).toBeHidden();
+});
+
+test('dark mode is remembered across reloads', async ({ page }) => {
+  await signUp(page, uniqueEmail());
+
+  await page.getByRole('button', { name: 'Dark mode' }).click();
+  await expect(page.getByRole('button', { name: 'Light mode' })).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('route53-color-mode')))
+    .toBe('dark');
+
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Light mode' })).toBeVisible();
+});
