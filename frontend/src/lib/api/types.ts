@@ -10,3 +10,7 @@ type Schemas = components['schemas'];
 
 export type HostedZone = Schemas['HostedZoneOut'];
 export type HostedZoneList = Schemas['HostedZoneList'];
+
+export type User = Schemas['UserOut'];
+export type SignInRequest = Schemas['SignInRequest'];
+export type SignUpRequest = Schemas['SignUpRequest'];

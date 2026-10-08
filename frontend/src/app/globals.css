@@ -15,3 +15,16 @@ body {
 body > div:first-child {
   height: 100%;
 }
+
+/* AppLayout reads this element's height through headerSelector. */
+#top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1002;
+}
+
+.auth-page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 64px 16px;
+}
