@@ -29,5 +29,11 @@ class RecordSet(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint("name = lower(name) AND name LIKE '%.'", name="name_is_canonical"),
         CheckConstraint(f"ttl IS NULL OR (ttl >= 0 AND ttl <= {TTL_MAX})", name="ttl_range"),
-        Index("ix_record_sets_hosted_zone_id_name_type", "hosted_zone_id", "name", "type"),
+        Index(
+            "ix_record_sets_hosted_zone_id_name_type",
+            "hosted_zone_id",
+            "name",
+            "type",
+            unique=True,
+        ),
     )
