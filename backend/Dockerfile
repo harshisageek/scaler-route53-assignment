@@ -3,7 +3,7 @@
 # Litestream restores the database from object storage at boot and streams every
 # later write back out, which is what lets a real SQLite file survive on a host
 # with an ephemeral disk.
-FROM python:3.12-slim-bookworm AS base
+FROM python:3.14-slim-bookworm AS base
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
